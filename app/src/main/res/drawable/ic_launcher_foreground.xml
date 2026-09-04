@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer Shield Glow / Drop Shadow -->
+    <path
+        android:fillColor="#152038"
+        android:pathData="M27,31 C27,29.5 28.5,28 30,28 L54,32 L78,28 C79.5,28 81,29.5 81,31 L81,54 C81,68 67,78 54,83 C41,78 27,68 27,54 Z" />
+
+    <!-- Outer Orange Shield Border (Neon Glow) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#EA580C"
+        android:strokeWidth="3.2"
+        android:strokeLineJoin="round"
+        android:pathData="M29,31 C29,30 30,29 31,29 L54,33 L77,29 C78,29 79,30 79,31 L79,53 C79,66 66,75.5 54,80.5 C42,75.5 29,66 29,53 Z" />
+
+    <!-- Bright Orange Accent Line for Shield -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FDBA74"
+        android:strokeWidth="1.2"
+        android:strokeLineJoin="round"
+        android:pathData="M30.5,32 L54,34.5 L77.5,32 L77.5,52.5 C77.5,64.5 65.5,73.5 54,78.5 C42.5,73.5 30.5,64.5 30.5,52.5 Z" />
+
+    <!-- Shield Inner Body (Deep Blue Space) -->
+    <path
+        android:fillColor="#0B132B"
+        android:pathData="M31,33 L54,35.5 L77,33 L77,52 C77,64 65,73 54,77.5 C43,73 31,64 31,52 Z" />
+
+    <!-- Lower Shield Curved Chevron Accent -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F97316"
+        android:strokeWidth="2.0"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M43,63 C46,67 51,70 54,71 C57,70 62,67 65,63" />
+
+    <!-- OPEN BOOK: Back Page Shadows (Cyan Depth) -->
+    <path
+        android:fillColor="#0369A1"
+        android:pathData="M54,58 C47,56 39,59 36,60 L36,49 C40,47 47,45 54,47 Z" />
+    <path
+        android:fillColor="#0284C7"
+        android:pathData="M54,58 C61,56 69,59 72,60 L72,49 C68,47 61,45 54,47 Z" />
+
+    <!-- OPEN BOOK: Main Glowing Pages (Left & Right) -->
+    <path
+        android:fillColor="#0EA5E9"
+        android:pathData="M54,56 C47,53.5 40,56 37.5,57.5 L37.5,46.5 C41.5,44.5 47,43 54,45 Z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M54,56 C61,53.5 68,56 70.5,57.5 L70.5,46.5 C66.5,44.5 61,43 54,45 Z" />
+
+    <!-- Book Inner Page Lines (White/Cyan Glow) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#BAE6FD"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M41,49 C45,48 49,47.5 52,48 M41,52.5 C45,51.5 49,51 52,51.5" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#E0F2FE"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M56,48 C59,47.5 63,48 67,49 M56,51.5 C59,51 63,51.5 67,52.5" />
+
+    <!-- Book Spine Glow -->
+    <path
+        android:strokeColor="#F8FAFC"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,45 L54,57" />
+
+    <!-- UPWARD GROWTH / TRENDING ARROW (Orange & Gold) -->
+    <!-- Arrow Trail / Shadow -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#9A3412"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M45,55 L50,51 L55,54 L73,34" />
+
+    <!-- Arrow Main Stem (Glowing Golden Orange) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M45,55 L50,51 L55,54 L73,34" />
+
+    <!-- Arrow Center Highlight -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FEF08A"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M46,55 L50,51.5 L55,54.5 L72.5,34.5" />
+
+    <!-- Arrow Head (Bold Geometric Polygon) -->
+    <path
+        android:fillColor="#F97316"
+        android:strokeColor="#FEF08A"
+        android:strokeWidth="0.8"
+        android:strokeLineJoin="round"
+        android:pathData="M74.5,32.5 L67,34.5 L70,37.5 L67.5,41 L72.5,39 L75.5,42 Z" />
+
+</vector>

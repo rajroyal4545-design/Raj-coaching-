@@ -1,0 +1,6 @@
+{
+  "name": "Coaching Attendance Manager",
+  "description": "Complete coaching institute student attendance and fee management app with offline local storage, backdated records, and monthly reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -36,3 +36,5 @@ jobs:
         with:
           name: Raj-Coaching-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+
+# APK build uses GitHub Actions Gradle setup

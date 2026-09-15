@@ -20,11 +20,13 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Make Gradle executable
-        run: chmod +x gradlew
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.3.1'
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Show APK
         run: find app/build/outputs -type f -name "*.apk" -print

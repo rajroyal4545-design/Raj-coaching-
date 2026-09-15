@@ -83,6 +83,10 @@ class CoachingRepository(private val database: AppDatabase) {
         attendanceDao.deleteByStudentAndDate(studentId, date)
     }
 
+    suspend fun clearAttendanceForDate(date: String) {
+        attendanceDao.deleteForDate(date)
+    }
+
     suspend fun addFeePayment(payment: FeePayment): Long {
         return feePaymentDao.insert(payment)
     }

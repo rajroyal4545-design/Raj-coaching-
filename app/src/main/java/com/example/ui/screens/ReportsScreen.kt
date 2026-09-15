@@ -22,6 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -43,6 +44,8 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.components.AvatarInitials
 import com.example.ui.components.SimpleMonthPickerDialog
 import com.example.ui.theme.AbsentRed
+import com.example.ui.theme.ClosedGray
+import com.example.ui.theme.LeaveBlue
 import com.example.ui.theme.PresentGreen
 import com.example.ui.theme.WarningAmber
 import com.example.ui.viewmodel.CoachingViewModel
@@ -59,6 +62,7 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
     val currency = profile.currencySymbol
 
     var showMonthPicker by remember { mutableStateOf(false) }
+    var reportFilter by remember { mutableStateOf("ALL") } // "ALL", "DUE_ONLY", "PAID_ONLY"
 
     // Aggregate monthly numbers
     val totalStudents = allStudents.size
@@ -69,12 +73,29 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
     val totalAttendanceRecords = monthAttendance.size
     val totalPresentRecords = monthAttendance.count { it.status == "PRESENT" }
     val totalAbsentRecords = monthAttendance.count { it.status == "ABSENT" }
-    val overallAttendancePercent = if (totalAttendanceRecords > 0) {
-        ((totalPresentRecords.toDouble() / totalAttendanceRecords) * 100).toInt()
+    val totalLeaveRecords = monthAttendance.count { it.status == "LEAVE" }
+    val closedDaysCount = monthAttendance.filter { it.status == "CLOSED" }.map { it.date }.distinct().size
+    val activeSessionDays = monthAttendance.filter { it.status != "CLOSED" }.map { it.date }.distinct().size
+    val overallAttendancePercent = if ((totalPresentRecords + totalAbsentRecords) > 0) {
+        ((totalPresentRecords.toDouble() / (totalPresentRecords + totalAbsentRecords)) * 100).toInt()
     } else 0
 
     // Unique dates attendance was recorded in this month
     val uniqueSessionDays = monthAttendance.map { it.date }.distinct().size
+
+    val displayedStudents = remember(allStudents, monthPayments, reportFilter) {
+        when (reportFilter) {
+            "DUE_ONLY" -> allStudents.filter { s ->
+                val paid = monthPayments.filter { it.studentId == s.id }.sumOf { it.amountPaid }
+                paid < s.monthlyFee
+            }
+            "PAID_ONLY" -> allStudents.filter { s ->
+                val paid = monthPayments.filter { it.studentId == s.id }.sumOf { it.amountPaid }
+                paid >= s.monthlyFee
+            }
+            else -> allStudents
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -171,10 +192,15 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        ReportMetric("Classes Held", "$uniqueSessionDays days")
-                        ReportMetric("Total Present", "$totalPresentRecords", PresentGreen)
-                        ReportMetric("Total Absent", "$totalAbsentRecords", AbsentRed)
-                        ReportMetric("Avg Attendance", "$overallAttendancePercent%")
+                        ReportMetric("Classes", "$activeSessionDays d")
+                        ReportMetric("Present", "$totalPresentRecords", PresentGreen)
+                        ReportMetric("Absent", "$totalAbsentRecords", AbsentRed)
+                        ReportMetric("Leave", "$totalLeaveRecords", LeaveBlue)
+                        if (closedDaysCount > 0) {
+                            ReportMetric("Closed", "$closedDaysCount d", ClosedGray)
+                        } else {
+                            ReportMetric("Avg Att", "$overallAttendancePercent%")
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -202,18 +228,39 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
 
         // Student-by-Student breakdown header
         item {
-            Text(
-                text = "Student-wise Breakdown / छात्र-वार स्थिति",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
+            Column {
+                Text(
+                    text = "Student-wise Breakdown / छात्र-वार स्थिति",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = reportFilter == "ALL",
+                        onClick = { reportFilter = "ALL" },
+                        label = { Text("All (${allStudents.size})", fontSize = 12.sp) }
+                    )
+                    FilterChip(
+                        selected = reportFilter == "DUE_ONLY",
+                        onClick = { reportFilter = "DUE_ONLY" },
+                        label = { Text("Only Due / बकाया", fontSize = 12.sp) }
+                    )
+                    FilterChip(
+                        selected = reportFilter == "PAID_ONLY",
+                        onClick = { reportFilter = "PAID_ONLY" },
+                        label = { Text("Only Paid / चुकता", fontSize = 12.sp) }
+                    )
+                }
+            }
         }
 
         // Student-by-student cards
-        items(allStudents, key = { it.id }) { student ->
+        items(displayedStudents, key = { it.id }) { student ->
             val studentAtt = monthAttendance.filter { it.studentId == student.id }
             val studentPresent = studentAtt.count { it.status == "PRESENT" }
             val studentAbsent = studentAtt.count { it.status == "ABSENT" }
+            val studentLeave = studentAtt.count { it.status == "LEAVE" }
             val studentTotal = studentPresent + studentAbsent
             val studentAttPercent = if (studentTotal > 0) ((studentPresent.toDouble() / studentTotal) * 100).toInt() else 0
 
@@ -249,9 +296,9 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Att: $studentPresent/$studentTotal days ($studentAttPercent%)",
+                            text = "P: $studentPresent • A: $studentAbsent • L: $studentLeave ($studentAttPercent%)",
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (studentAttPercent >= 75) PresentGreen else AbsentRed,
+                            color = if (studentAttPercent >= 75) PresentGreen else if (studentTotal == 0) MaterialTheme.colorScheme.onSurfaceVariant else AbsentRed,
                             fontWeight = FontWeight.Medium
                         )
                     }

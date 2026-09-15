@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Payments
@@ -76,6 +78,8 @@ import com.example.ui.theme.PresentGreen
 import com.example.ui.theme.WarningAmber
 import com.example.ui.viewmodel.CoachingViewModel
 import com.example.ui.viewmodel.StudentFeeSummary
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -87,15 +91,23 @@ fun FeesScreen(viewModel: CoachingViewModel) {
     val profile by viewModel.coachingProfile.collectAsState()
     val currency = profile.currencySymbol
 
-    var selectedTabIndex by remember { mutableIntStateOf(0) } // 0: Student Status, 1: Recent Payments
+    var selectedTabIndex by remember { mutableIntStateOf(0) } // 0: Unpaid/Due, 1: Paid/Cleared, 2: History
     var showAddPaymentDialog by remember { mutableStateOf(false) }
     var paymentToEdit by remember { mutableStateOf<FeePayment?>(null) }
     var paymentToDelete by remember { mutableStateOf<FeePayment?>(null) }
     var showMonthPicker by remember { mutableStateOf(false) }
     var preselectedStudentForPayment by remember { mutableStateOf<Student?>(null) }
+    var preselectedAmountForPayment by remember { mutableStateOf<Double?>(null) }
 
     val totalCollected = feeSummaries.sumOf { it.totalPaidForMonth }
     val totalPending = feeSummaries.sumOf { it.pendingForMonth }
+
+    val unpaidSummaries = remember(feeSummaries) {
+        feeSummaries.filter { !it.isPaidInFull }
+    }
+    val paidSummaries = remember(feeSummaries) {
+        feeSummaries.filter { it.isPaidInFull }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -185,7 +197,7 @@ fun FeesScreen(viewModel: CoachingViewModel) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Tabs: Student-wise vs Payment Records
+            // Tabs: 0: Unpaid (Due), 1: Paid (Cleared), 2: Payment History
             TabRow(
                 selectedTabIndex = selectedTabIndex,
                 modifier = Modifier.clip(RoundedCornerShape(10.dp))
@@ -193,67 +205,132 @@ fun FeesScreen(viewModel: CoachingViewModel) {
                 Tab(
                     selected = selectedTabIndex == 0,
                     onClick = { selectedTabIndex = 0 },
-                    text = { Text("Student Status (${feeSummaries.size})", fontWeight = FontWeight.SemiBold) }
+                    text = {
+                        Text(
+                            text = "Unpaid (${unpaidSummaries.size})",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                    }
                 )
                 Tab(
                     selected = selectedTabIndex == 1,
                     onClick = { selectedTabIndex = 1 },
-                    text = { Text("All Payments (${allPayments.size})", fontWeight = FontWeight.SemiBold) }
+                    text = {
+                        Text(
+                            text = "Paid (${paidSummaries.size})",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTabIndex == 2,
+                    onClick = { selectedTabIndex = 2 },
+                    text = {
+                        Text(
+                            text = "History (${allPayments.size})",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                    }
                 )
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            if (selectedTabIndex == 0) {
-                // Student Status List
-                if (feeSummaries.isEmpty()) {
-                    EmptyStateView(
-                        icon = Icons.Default.Payments,
-                        title = "No Students",
-                        description = "Add students in the Students tab to track fees."
-                    )
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(feeSummaries, key = { it.student.id }) { summary ->
-                            StudentFeeCard(
-                                summary = summary,
-                                currency = currency,
-                                onPayNow = {
-                                    preselectedStudentForPayment = summary.student
-                                    showAddPaymentDialog = true
-                                }
+            when (selectedTabIndex) {
+                0 -> {
+                    // Only students who have unpaid / due fees for this month
+                    if (unpaidSummaries.isEmpty()) {
+                        if (allStudents.isEmpty()) {
+                            EmptyStateView(
+                                icon = Icons.Default.Payments,
+                                title = "No Students",
+                                description = "Add students in the Students tab to track fees."
+                            )
+                        } else {
+                            EmptyStateView(
+                                icon = Icons.Default.CheckCircle,
+                                title = "All Fees Cleared! 🎉",
+                                description = "इस महीने ($selectedMonth) में सभी छात्रों की फीस जमा (Paid) है। कोई बकाया नहीं है।"
                             )
                         }
-                        item { Spacer(modifier = Modifier.height(72.dp)) }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(unpaidSummaries, key = { it.student.id }) { summary ->
+                                StudentFeeCard(
+                                    summary = summary,
+                                    currency = currency,
+                                    selectedMonth = selectedMonth,
+                                    onPayNow = {
+                                        preselectedStudentForPayment = summary.student
+                                        preselectedAmountForPayment = summary.pendingForMonth
+                                        showAddPaymentDialog = true
+                                    }
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(72.dp)) }
+                        }
                     }
                 }
-            } else {
-                // Payment History List
-                if (allPayments.isEmpty()) {
-                    EmptyStateView(
-                        icon = Icons.Default.Payments,
-                        title = "No Payments Recorded",
-                        description = "Click '+ Add Payment' to record your first fee transaction."
-                    )
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(allPayments, key = { it.id }) { payment ->
-                            val student = allStudents.find { it.id == payment.studentId }
-                            PaymentHistoryRow(
-                                payment = payment,
-                                studentName = student?.name ?: "Student #${payment.studentId}",
-                                currency = currency,
-                                onEdit = { paymentToEdit = payment },
-                                onDelete = { paymentToDelete = payment }
-                            )
+                1 -> {
+                    // Students whose payment is cleared for this month
+                    if (paidSummaries.isEmpty()) {
+                        EmptyStateView(
+                            icon = Icons.Default.Payments,
+                            title = "No Cleared Payments Yet",
+                            description = "इस महीने ($selectedMonth) में अभी किसी छात्र की पूर्ण फीस जमा नहीं हुई है।"
+                        )
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(paidSummaries, key = { it.student.id }) { summary ->
+                                StudentFeeCard(
+                                    summary = summary,
+                                    currency = currency,
+                                    selectedMonth = selectedMonth,
+                                    onPayNow = {
+                                        preselectedStudentForPayment = summary.student
+                                        preselectedAmountForPayment = null
+                                        showAddPaymentDialog = true
+                                    }
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(72.dp)) }
                         }
-                        item { Spacer(modifier = Modifier.height(72.dp)) }
+                    }
+                }
+                2 -> {
+                    // Payment History List
+                    if (allPayments.isEmpty()) {
+                        EmptyStateView(
+                            icon = Icons.Default.Payments,
+                            title = "No Payments Recorded",
+                            description = "Click '+ Record Payment' to record your first fee transaction."
+                        )
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(allPayments, key = { it.id }) { payment ->
+                                val student = allStudents.find { it.id == payment.studentId }
+                                PaymentHistoryRow(
+                                    payment = payment,
+                                    studentName = student?.name ?: "Student #${payment.studentId}",
+                                    currency = currency,
+                                    onEdit = { paymentToEdit = payment },
+                                    onDelete = { paymentToDelete = payment }
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(72.dp)) }
+                        }
                     }
                 }
             }
@@ -285,15 +362,18 @@ fun FeesScreen(viewModel: CoachingViewModel) {
             initialPayment = null,
             students = allStudents,
             preselectedStudent = preselectedStudentForPayment,
+            defaultAmount = preselectedAmountForPayment,
             defaultMonth = selectedMonth,
             onDismiss = {
                 showAddPaymentDialog = false
                 preselectedStudentForPayment = null
+                preselectedAmountForPayment = null
             },
             onSave = { payment ->
                 viewModel.addFeePayment(payment)
                 showAddPaymentDialog = false
                 preselectedStudentForPayment = null
+                preselectedAmountForPayment = null
             }
         )
     }
@@ -304,6 +384,7 @@ fun FeesScreen(viewModel: CoachingViewModel) {
             initialPayment = payment,
             students = allStudents,
             preselectedStudent = allStudents.find { it.id == payment.studentId },
+            defaultAmount = null,
             defaultMonth = payment.forMonthYear,
             onDismiss = { paymentToEdit = null },
             onSave = { updated ->
@@ -339,8 +420,10 @@ fun FeesScreen(viewModel: CoachingViewModel) {
 fun StudentFeeCard(
     summary: StudentFeeSummary,
     currency: String,
+    selectedMonth: String,
     onPayNow: () -> Unit
 ) {
+    val context = LocalContext.current
     val student = summary.student
     val isPaid = summary.isPaidInFull
     val isPartial = summary.totalPaidForMonth > 0 && !isPaid
@@ -367,7 +450,7 @@ fun StudentFeeCard(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Roll: #${student.rollNumber} • ${student.batch}",
+                            text = "Roll: #${student.rollNumber} • ${student.batch}" + (if (student.joiningDate.isNotBlank()) " • Adm: ${student.joiningDate}" else ""),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -384,9 +467,9 @@ fun StudentFeeCard(
                 ) {
                     Text(
                         text = when {
-                            isPaid -> "PAID"
-                            isPartial -> "PARTIAL"
-                            else -> "DUE"
+                            isPaid -> "PAID / चुकता"
+                            isPartial -> "PARTIAL / आंशिक"
+                            else -> "DUE / बकाया"
                         },
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
@@ -404,7 +487,8 @@ fun StudentFeeCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
                     Text("Monthly Fee", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -419,13 +503,70 @@ fun StudentFeeCard(
                     Text("$currency ${String.format(Locale.US, "%,.0f", summary.pendingForMonth)}", fontWeight = FontWeight.Bold, color = AbsentRed)
                 }
 
-                Button(
-                    onClick = onPayNow,
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Text("+ Pay", fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (!isPaid && student.mobileNumber.isNotBlank()) {
+                        IconButton(
+                            onClick = {
+                                val message = "नमस्ते! छात्र ${student.name} की माह $selectedMonth की कोचिंग फीस बकाया है। कुल बकाया राशि: $currency ${String.format(Locale.US, "%,.0f", summary.pendingForMonth)}। कृपया जल्द भुगतान कराने का कष्ट करें। धन्यवाद।"
+                                val uri = Uri.parse("https://api.whatsapp.com/send?phone=${student.mobileNumber}&text=${Uri.encode(message)}")
+                                val intent = Intent(Intent.ACTION_VIEW, uri)
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, message)
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Send Fee Reminder"))
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Chat,
+                                contentDescription = "Send WhatsApp Reminder",
+                                tint = Color(0xFF25D366),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    if (!isPaid) {
+                        Button(
+                            onClick = onPayNow,
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                            modifier = Modifier.height(36.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        ) {
+                            Text("+ Pay", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else if (student.mobileNumber.isNotBlank()) {
+                        IconButton(
+                            onClick = {
+                                val message = "फीस रसीद (Receipt): छात्र ${student.name} की माह $selectedMonth की कुल फीस $currency ${String.format(Locale.US, "%,.0f", summary.totalPaidForMonth)} प्राप्त हो चुकी है। धन्यवाद।"
+                                val uri = Uri.parse("https://api.whatsapp.com/send?phone=${student.mobileNumber}&text=${Uri.encode(message)}")
+                                val intent = Intent(Intent.ACTION_VIEW, uri)
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, message)
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share Receipt"))
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Chat,
+                                contentDescription = "Share Receipt",
+                                tint = PresentGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -490,10 +631,14 @@ fun FeePaymentFormDialog(
     initialPayment: FeePayment?,
     students: List<Student>,
     preselectedStudent: Student?,
+    defaultAmount: Double? = null,
     defaultMonth: String,
     onDismiss: () -> Unit,
     onSave: (FeePayment) -> Unit
 ) {
+    val defaultTodayDate = remember {
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    }
     var selectedStudent by remember {
         mutableStateOf(preselectedStudent ?: students.firstOrNull())
     }
@@ -502,11 +647,12 @@ fun FeePaymentFormDialog(
     var amountText by remember {
         mutableStateOf(
             initialPayment?.amountPaid?.let { String.format(Locale.US, "%.0f", it) }
+                ?: defaultAmount?.let { String.format(Locale.US, "%.0f", it) }
                 ?: selectedStudent?.monthlyFee?.let { String.format(Locale.US, "%.0f", it) }
                 ?: "1000"
         )
     }
-    var paymentDate by remember { mutableStateOf(initialPayment?.paymentDate ?: "2026-09-03") }
+    var paymentDate by remember { mutableStateOf(initialPayment?.paymentDate ?: defaultTodayDate) }
     var forMonthYear by remember { mutableStateOf(initialPayment?.forMonthYear ?: defaultMonth) }
     var paymentMode by remember { mutableStateOf(initialPayment?.paymentMode ?: "Cash") }
     var remarks by remember { mutableStateOf(initialPayment?.remarks ?: "") }

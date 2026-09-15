@@ -100,7 +100,8 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
                 s.name.contains(query, ignoreCase = true) ||
                 s.rollNumber.contains(query, ignoreCase = true) ||
                 s.studentClass.contains(query, ignoreCase = true) ||
-                s.mobileNumber.contains(query, ignoreCase = true)
+                s.mobileNumber.contains(query, ignoreCase = true) ||
+                s.joiningDate.contains(query, ignoreCase = true)
             val matchesBatch = batch == "All" || s.batch.equals(batch, ignoreCase = true)
             matchesQuery && matchesBatch
         }
@@ -167,14 +168,25 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
 
         var presentCount = 0
         var absentCount = 0
+        var leaveCount = 0
+        var isClosed = false
+
+        if (todayAttendance.isNotEmpty() && todayAttendance.values.all { it.status == "CLOSED" }) {
+            isClosed = true
+        }
+
         activeStudents.forEach { s ->
             val record = todayAttendance[s.id]
             if (record != null) {
-                if (record.status == "PRESENT") presentCount++
-                else if (record.status == "ABSENT") absentCount++
+                when (record.status) {
+                    "PRESENT" -> presentCount++
+                    "ABSENT" -> absentCount++
+                    "LEAVE" -> leaveCount++
+                    "CLOSED" -> isClosed = true
+                }
             }
         }
-        val unmarkedCount = (totalStudentsCount - presentCount - absentCount).coerceAtLeast(0)
+        val unmarkedCount = if (isClosed) 0 else (totalStudentsCount - presentCount - absentCount - leaveCount).coerceAtLeast(0)
 
         val currentMonthPayments = payments.filter { it.forMonthYear == currentMonth }
         val collectedFee = currentMonthPayments.sumOf { it.amountPaid }
@@ -186,6 +198,8 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
             totalStudents = totalStudentsCount,
             todayPresent = presentCount,
             todayAbsent = absentCount,
+            todayLeave = leaveCount,
+            isTodayClosed = isClosed,
             todayUnmarked = unmarkedCount,
             currentMonthCollection = collectedFee,
             totalExpectedFee = totalExpectedFee,
@@ -300,6 +314,29 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun markAllLeave() {
+        val date = _selectedDate.value
+        val students = allStudents.value.filter { it.isActive }
+        viewModelScope.launch {
+            repository.markAllAttendance(date, students, "LEAVE")
+        }
+    }
+
+    fun markCoachingClosed() {
+        val date = _selectedDate.value
+        val students = allStudents.value.filter { it.isActive }
+        viewModelScope.launch {
+            repository.markAllAttendance(date, students, "CLOSED")
+        }
+    }
+
+    fun clearDayAttendance() {
+        val date = _selectedDate.value
+        viewModelScope.launch {
+            repository.clearAttendanceForDate(date)
+        }
+    }
+
     fun removeAttendance(studentId: Long) {
         val date = _selectedDate.value
         viewModelScope.launch {
@@ -333,6 +370,8 @@ data class DashboardData(
     val totalStudents: Int = 0,
     val todayPresent: Int = 0,
     val todayAbsent: Int = 0,
+    val todayLeave: Int = 0,
+    val isTodayClosed: Boolean = false,
     val todayUnmarked: Int = 0,
     val currentMonthCollection: Double = 0.0,
     val totalExpectedFee: Double = 0.0,

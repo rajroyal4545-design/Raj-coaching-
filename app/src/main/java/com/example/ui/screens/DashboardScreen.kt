@@ -18,11 +18,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Button
@@ -50,8 +52,12 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.components.StatCard
 import com.example.ui.theme.AbsentRed
 import com.example.ui.theme.AbsentRedLight
+import com.example.ui.theme.ClosedGray
+import com.example.ui.theme.ClosedGrayLight
 import com.example.ui.theme.IndigoDark
 import com.example.ui.theme.IndigoLight
+import com.example.ui.theme.LeaveBlue
+import com.example.ui.theme.LeaveBlueLight
 import com.example.ui.theme.PresentGreen
 import com.example.ui.theme.PresentGreenLight
 import com.example.ui.theme.WarningAmber
@@ -161,7 +167,7 @@ fun DashboardScreen(
                                         color = Color.White.copy(alpha = 0.8f)
                                     )
                                     Text(
-                                        text = "${metrics.todayPresent} / ${metrics.totalStudents} Present",
+                                        text = if (metrics.isTodayClosed) "Coaching Closed (आज अवकाश)" else "${metrics.todayPresent} / ${metrics.totalStudents} Present",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White
@@ -287,14 +293,25 @@ fun DashboardScreen(
                         bgColor = AbsentRedLight,
                         modifier = Modifier.weight(1f)
                     )
-                    StatCard(
-                        title = "Unmarked Today\nबिना हाजिरी",
-                        value = "${metrics.todayUnmarked}",
-                        icon = Icons.Default.NotificationsActive,
-                        iconColor = WarningAmber,
-                        bgColor = WarningAmberLight,
-                        modifier = Modifier.weight(1f)
-                    )
+                    if (metrics.isTodayClosed) {
+                        StatCard(
+                            title = "Coaching Closed\nकोचिंग अवकाश",
+                            value = "CLOSED",
+                            icon = Icons.Default.EventBusy,
+                            iconColor = ClosedGray,
+                            bgColor = ClosedGrayLight,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        StatCard(
+                            title = "Today's Leave\nआज छुट्टी (Leave)",
+                            value = "${metrics.todayLeave}",
+                            icon = Icons.Default.Schedule,
+                            iconColor = LeaveBlue,
+                            bgColor = LeaveBlueLight,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
 
                 Row(

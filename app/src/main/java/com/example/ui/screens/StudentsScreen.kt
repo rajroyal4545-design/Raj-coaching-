@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
@@ -73,9 +74,12 @@ import com.example.data.model.Student
 import com.example.ui.components.AvatarInitials
 import com.example.ui.components.ConfirmDeleteDialog
 import com.example.ui.components.EmptyStateView
+import com.example.ui.components.SimpleDatePickerDialog
 import com.example.ui.theme.AbsentRed
 import com.example.ui.theme.PresentGreen
 import com.example.ui.viewmodel.CoachingViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -306,12 +310,26 @@ fun StudentCard(
 
                 Spacer(modifier = Modifier.height(2.dp))
 
-                Text(
-                    text = "Fee: $currency ${String.format(Locale.US, "%,.0f", student.monthlyFee)}/mo",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF059669)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Fee: $currency ${String.format(Locale.US, "%,.0f", student.monthlyFee)}/mo",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF059669)
+                    )
+                    if (student.joiningDate.isNotBlank()) {
+                        Text(
+                            text = "Adm: ${student.joiningDate}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
 
             // Call shortcut button
@@ -359,6 +377,9 @@ fun StudentFormDialog(
     onDismiss: () -> Unit,
     onSave: (Student) -> Unit
 ) {
+    val defaultTodayDate = remember {
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    }
     var name by remember { mutableStateOf(student?.name ?: "") }
     var guardianName by remember { mutableStateOf(student?.guardianName ?: "") }
     var mobileNumber by remember { mutableStateOf(student?.mobileNumber ?: "") }
@@ -366,7 +387,10 @@ fun StudentFormDialog(
     var studentClass by remember { mutableStateOf(student?.studentClass ?: "10th") }
     var batch by remember { mutableStateOf(student?.batch ?: "Morning") }
     var rollNumber by remember { mutableStateOf(student?.rollNumber ?: "") }
-    var joiningDate by remember { mutableStateOf(student?.joiningDate ?: "") }
+    var joiningDate by remember {
+        mutableStateOf(if (!student?.joiningDate.isNullOrBlank()) student!!.joiningDate else defaultTodayDate)
+    }
+    var showAdmissionDatePicker by remember { mutableStateOf(false) }
     var monthlyFeeText by remember { mutableStateOf(student?.monthlyFee?.let { String.format(Locale.US, "%.0f", it) } ?: "1000") }
     var nameError by remember { mutableStateOf(false) }
 
@@ -435,6 +459,52 @@ fun StudentFormDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Admission Date Picker Field
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { showAdmissionDatePicker = true },
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Admission Date / प्रवेश तिथि",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = joiningDate.ifBlank { defaultTodayDate },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                        TextButton(onClick = { showAdmissionDatePicker = true }) {
+                            Text("Change / बदलें", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -531,7 +601,7 @@ fun StudentFormDialog(
                                 studentClass = studentClass.trim(),
                                 batch = batch.trim(),
                                 rollNumber = rollNumber.trim(),
-                                joiningDate = joiningDate.ifBlank { "2026-09-01" },
+                                joiningDate = joiningDate.ifBlank { defaultTodayDate },
                                 monthlyFee = fee,
                                 avatarColorHex = selectedColor
                             )
@@ -543,6 +613,14 @@ fun StudentFormDialog(
                 }
             }
         }
+    }
+
+    if (showAdmissionDatePicker) {
+        SimpleDatePickerDialog(
+            initialDate = joiningDate.ifBlank { defaultTodayDate },
+            onDateSelected = { joiningDate = it },
+            onDismiss = { showAdmissionDatePicker = false }
+        )
     }
 }
 
@@ -593,7 +671,7 @@ fun StudentDetailDialog(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Roll: #${student.rollNumber} • Class ${student.studentClass}",
+                                text = "Roll: #${student.rollNumber} • Class ${student.studentClass}" + (if (student.joiningDate.isNotBlank()) " • Adm: ${student.joiningDate}" else ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -669,6 +747,7 @@ fun StudentDetailDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         DetailRow("Batch / बैच:", student.batch)
+                        DetailRow("Admission Date / प्रवेश तिथि:", student.joiningDate.ifBlank { "Not specified" })
                         DetailRow("Guardian / अभिभावक:", student.guardianName.ifBlank { "Not specified" })
                         DetailRow("Phone / फ़ोन:", student.mobileNumber.ifBlank { "Not provided" })
                         DetailRow("Address / पता:", student.address.ifBlank { "Not provided" })

@@ -1,9 +1,7 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,8 +21,14 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.HomeRepairService
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -54,7 +58,10 @@ import com.example.ui.components.EmptyStateView
 import com.example.ui.components.SimpleDatePickerDialog
 import com.example.ui.theme.AbsentRed
 import com.example.ui.theme.AbsentRedLight
-import com.example.ui.theme.IndigoLight
+import com.example.ui.theme.ClosedGray
+import com.example.ui.theme.ClosedGrayLight
+import com.example.ui.theme.LeaveBlue
+import com.example.ui.theme.LeaveBlueLight
 import com.example.ui.theme.PresentGreen
 import com.example.ui.theme.PresentGreenLight
 import com.example.ui.theme.WarningAmber
@@ -69,13 +76,18 @@ fun AttendanceScreen(viewModel: CoachingViewModel) {
     val today = viewModel.todayDateString
 
     var showDatePicker by remember { mutableStateOf(false) }
+    var showCloseConfirmDialog by remember { mutableStateOf(false) }
 
     val isToday = selectedDate == today
     val isPastDate = selectedDate < today
 
+    // Calculate status counts
     val presentCount = students.count { attendanceMap[it.id]?.status == "PRESENT" }
     val absentCount = students.count { attendanceMap[it.id]?.status == "ABSENT" }
-    val unmarkedCount = students.size - presentCount - absentCount
+    val leaveCount = students.count { attendanceMap[it.id]?.status == "LEAVE" }
+    val closedCount = students.count { attendanceMap[it.id]?.status == "CLOSED" }
+    val isDayClosed = closedCount > 0 && closedCount >= (students.size / 2).coerceAtLeast(1)
+    val unmarkedCount = if (isDayClosed) 0 else (students.size - presentCount - absentCount - leaveCount).coerceAtLeast(0)
 
     Column(
         modifier = Modifier
@@ -161,80 +173,192 @@ fun AttendanceScreen(viewModel: CoachingViewModel) {
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Attendance stats banner
+        // Coaching Closed Banner (if day is marked closed)
+        if (isDayClosed) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = ClosedGrayLight
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Icon(
+                            imageVector = Icons.Default.EventBusy,
+                            contentDescription = null,
+                            tint = ClosedGray,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Coaching Closed / कोचिंग बंद (अवकाश)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = ClosedGray
+                            )
+                            Text(
+                                text = "इस तारीख पर कोचिंग का अवकाश घोषित है",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ClosedGray
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.clearDayAttendance() },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Re-Open / चालू करें", fontSize = 11.sp)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        // Attendance stats banner (Present, Absent, Leave, Unmarked)
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Surface(
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 color = PresentGreenLight
             ) {
                 Column(
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.padding(8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Present / उपस्थित", style = MaterialTheme.typography.labelSmall, color = PresentGreen, fontWeight = FontWeight.Bold)
-                    Text("$presentCount", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = PresentGreen)
+                    Text("Present", style = MaterialTheme.typography.labelSmall, color = PresentGreen, fontWeight = FontWeight.Bold)
+                    Text("$presentCount", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = PresentGreen)
                 }
             }
 
             Surface(
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 color = AbsentRedLight
             ) {
                 Column(
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.padding(8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Absent / अनुपस्थित", style = MaterialTheme.typography.labelSmall, color = AbsentRed, fontWeight = FontWeight.Bold)
-                    Text("$absentCount", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = AbsentRed)
+                    Text("Absent", style = MaterialTheme.typography.labelSmall, color = AbsentRed, fontWeight = FontWeight.Bold)
+                    Text("$absentCount", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = AbsentRed)
                 }
             }
 
             Surface(
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                color = WarningAmberLight
+                shape = RoundedCornerShape(10.dp),
+                color = LeaveBlueLight
             ) {
                 Column(
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.padding(8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Unmarked / शेष", style = MaterialTheme.typography.labelSmall, color = WarningAmber, fontWeight = FontWeight.Bold)
-                    Text("$unmarkedCount", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = WarningAmber)
+                    Text("Leave (छुट्टी)", style = MaterialTheme.typography.labelSmall, color = LeaveBlue, fontWeight = FontWeight.Bold)
+                    Text("$leaveCount", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = LeaveBlue)
+                }
+            }
+
+            Surface(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+                color = if (isDayClosed) ClosedGrayLight else WarningAmberLight
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = if (isDayClosed) "Closed" else "Unmarked",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isDayClosed) ClosedGray else WarningAmber,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (isDayClosed) "बंद" else "$unmarkedCount",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDayClosed) ClosedGray else WarningAmber
+                    )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Bulk Actions (Mark all present / Mark all absent)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Button(
-                onClick = { viewModel.markAllPresent() },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PresentGreen)
+        // Bulk Action Bar with All Present, All Absent, All Leave, and Coaching Closed
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("All Present (सब उपस्थित)", fontSize = 12.sp)
+                Button(
+                    onClick = { viewModel.markAllPresent() },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PresentGreen)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("All Present", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = { viewModel.markAllAbsent() },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AbsentRed)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("All Absent", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = { viewModel.markAllLeave() },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = LeaveBlue)
+                ) {
+                    Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("All Leave", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
+            // Dedicated "Coaching Closed (कोचिंग बंद)" Button
             OutlinedButton(
-                onClick = { viewModel.markAllAbsent() },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(10.dp)
+                onClick = { showCloseConfirmDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = if (isDayClosed) ClosedGray else Color(0xFF64748B)
+                )
             ) {
-                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp), tint = AbsentRed)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("All Absent", fontSize = 12.sp, color = AbsentRed)
+                Icon(
+                    imageVector = if (isDayClosed) Icons.Default.EventBusy else Icons.Default.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = if (isDayClosed) ClosedGray else Color(0xFF64748B)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isDayClosed) "Mark Coaching as Open / पुनः चालू करें" else "Coaching Closed Today / आज कोचिंग बंद है",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
 
@@ -254,14 +378,23 @@ fun AttendanceScreen(viewModel: CoachingViewModel) {
             ) {
                 items(students, key = { it.id }) { student ->
                     val record = attendanceMap[student.id]
-                    val status = record?.status // "PRESENT", "ABSENT", or null
+                    val status = record?.status // "PRESENT", "ABSENT", "LEAVE", "CLOSED", or null
 
                     AttendanceStudentRow(
                         student = student,
                         status = status,
-                        onMarkPresent = { viewModel.markAttendance(student.id, "PRESENT") },
-                        onMarkAbsent = { viewModel.markAttendance(student.id, "ABSENT") },
-                        onClear = { viewModel.removeAttendance(student.id) }
+                        onMarkPresent = {
+                            if (status == "PRESENT") viewModel.removeAttendance(student.id)
+                            else viewModel.markAttendance(student.id, "PRESENT")
+                        },
+                        onMarkAbsent = {
+                            if (status == "ABSENT") viewModel.removeAttendance(student.id)
+                            else viewModel.markAttendance(student.id, "ABSENT")
+                        },
+                        onMarkLeave = {
+                            if (status == "LEAVE") viewModel.removeAttendance(student.id)
+                            else viewModel.markAttendance(student.id, "LEAVE")
+                        }
                     )
                 }
                 item {
@@ -278,6 +411,56 @@ fun AttendanceScreen(viewModel: CoachingViewModel) {
             onDismiss = { showDatePicker = false }
         )
     }
+
+    if (showCloseConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showCloseConfirmDialog = false },
+            icon = {
+                Icon(
+                    imageVector = if (isDayClosed) Icons.Default.LockOpen else Icons.Default.EventBusy,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = if (isDayClosed) "Re-Open Coaching? / कोचिंग चालू करें?" else "Mark Coaching Closed? / कोचिंग बंद करें?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (isDayClosed)
+                        "Are you sure you want to re-open coaching for $selectedDate and clear closed status?"
+                    else
+                        "Do you want to mark $selectedDate as Coaching Holiday/Closed? All students will be marked as Closed for this date."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (isDayClosed) {
+                            viewModel.clearDayAttendance()
+                        } else {
+                            viewModel.markCoachingClosed()
+                        }
+                        showCloseConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDayClosed) PresentGreen else ClosedGray
+                    )
+                ) {
+                    Text(if (isDayClosed) "Re-Open (चालू करें)" else "Yes, Close (बंद करें)")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showCloseConfirmDialog = false }) {
+                    Text("Cancel / रद्द करें")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -286,8 +469,10 @@ fun AttendanceStudentRow(
     status: String?,
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
-    onClear: () -> Unit
+    onMarkLeave: () -> Unit
 ) {
+    val isClosed = status == "CLOSED"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -295,6 +480,8 @@ fun AttendanceStudentRow(
             containerColor = when (status) {
                 "PRESENT" -> Color(0xFFF0FDF4)
                 "ABSENT" -> Color(0xFFFEF2F2)
+                "LEAVE" -> Color(0xFFEFF6FF)
+                "CLOSED" -> Color(0xFFF8FAFC)
                 else -> MaterialTheme.colorScheme.surface
             }
         ),
@@ -303,12 +490,12 @@ fun AttendanceStudentRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AvatarInitials(name = student.name, colorHex = student.avatarColorHex, size = 42, fontSize = 16)
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -322,11 +509,19 @@ fun AttendanceStudentRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (isClosed) {
+                    Text(
+                        text = "Closed (अवकाश)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ClosedGray,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
-            // Quick Toggle Buttons with large touch targets
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Present Button
+            // Quick Toggle Buttons with large touch targets: Present (P), Absent (A), Leave (L)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Present Button (P)
                 Button(
                     onClick = onMarkPresent,
                     shape = RoundedCornerShape(8.dp),
@@ -334,14 +529,15 @@ fun AttendanceStudentRow(
                         containerColor = if (status == "PRESENT") PresentGreen else Color(0xFFE2E8F0),
                         contentColor = if (status == "PRESENT") Color.White else Color(0xFF475569)
                     ),
-                    modifier = Modifier.height(38.dp)
+                    modifier = Modifier
+                        .height(38.dp)
+                        .width(44.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("P", fontWeight = FontWeight.Bold)
+                    Text("P", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
 
-                // Absent Button
+                // Absent Button (A)
                 Button(
                     onClick = onMarkAbsent,
                     shape = RoundedCornerShape(8.dp),
@@ -349,11 +545,28 @@ fun AttendanceStudentRow(
                         containerColor = if (status == "ABSENT") AbsentRed else Color(0xFFE2E8F0),
                         contentColor = if (status == "ABSENT") Color.White else Color(0xFF475569)
                     ),
-                    modifier = Modifier.height(38.dp)
+                    modifier = Modifier
+                        .height(38.dp)
+                        .width(44.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("A", fontWeight = FontWeight.Bold)
+                    Text("A", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+
+                // Leave Button (L)
+                Button(
+                    onClick = onMarkLeave,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (status == "LEAVE") LeaveBlue else Color(0xFFE2E8F0),
+                        contentColor = if (status == "LEAVE") Color.White else Color(0xFF475569)
+                    ),
+                    modifier = Modifier
+                        .height(38.dp)
+                        .width(44.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                ) {
+                    Text("L", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }

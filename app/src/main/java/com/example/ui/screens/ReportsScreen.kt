@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.util.DateUtils
 import com.example.ui.components.AvatarInitials
 import com.example.ui.components.SimpleMonthPickerDialog
 import com.example.ui.theme.AbsentRed
@@ -64,9 +65,17 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
     var showMonthPicker by remember { mutableStateOf(false) }
     var reportFilter by remember { mutableStateOf("ALL") } // "ALL", "DUE_ONLY", "PAID_ONLY"
 
+    // Only include students admitted on or before selectedMonth (or with recorded payments)
+    val eligibleStudents = remember(allStudents, selectedMonth, monthPayments) {
+        allStudents.filter { s ->
+            DateUtils.isStudentAdmittedInOrBefore(s.joiningDate, selectedMonth) ||
+                monthPayments.any { it.studentId == s.id }
+        }
+    }
+
     // Aggregate monthly numbers
-    val totalStudents = allStudents.size
-    val totalExpectedFee = allStudents.sumOf { it.monthlyFee }
+    val totalStudents = eligibleStudents.size
+    val totalExpectedFee = eligibleStudents.sumOf { it.monthlyFee }
     val totalCollectedFee = monthPayments.sumOf { it.amountPaid }
     val totalPendingFee = (totalExpectedFee - totalCollectedFee).coerceAtLeast(0.0)
 
@@ -83,17 +92,17 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
     // Unique dates attendance was recorded in this month
     val uniqueSessionDays = monthAttendance.map { it.date }.distinct().size
 
-    val displayedStudents = remember(allStudents, monthPayments, reportFilter) {
+    val displayedStudents = remember(eligibleStudents, monthPayments, reportFilter) {
         when (reportFilter) {
-            "DUE_ONLY" -> allStudents.filter { s ->
+            "DUE_ONLY" -> eligibleStudents.filter { s ->
                 val paid = monthPayments.filter { it.studentId == s.id }.sumOf { it.amountPaid }
                 paid < s.monthlyFee
             }
-            "PAID_ONLY" -> allStudents.filter { s ->
+            "PAID_ONLY" -> eligibleStudents.filter { s ->
                 val paid = monthPayments.filter { it.studentId == s.id }.sumOf { it.amountPaid }
                 paid >= s.monthlyFee
             }
-            else -> allStudents
+            else -> eligibleStudents
         }
     }
 

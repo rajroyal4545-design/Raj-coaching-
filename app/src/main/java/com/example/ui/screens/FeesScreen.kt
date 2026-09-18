@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.model.FeePayment
 import com.example.data.model.Student
+import com.example.data.util.DateUtils
 import com.example.ui.components.AvatarInitials
 import com.example.ui.components.ConfirmDeleteDialog
 import com.example.ui.components.EmptyStateView
@@ -248,6 +249,12 @@ fun FeesScreen(viewModel: CoachingViewModel) {
                                 icon = Icons.Default.Payments,
                                 title = "No Students",
                                 description = "Add students in the Students tab to track fees."
+                            )
+                        } else if (feeSummaries.isEmpty()) {
+                            EmptyStateView(
+                                icon = Icons.Default.Payments,
+                                title = "No Admitted Students",
+                                description = "इस महीने ($selectedMonth) या इससे पहले कोई छात्र नामांकित (Admitted) नहीं है।"
                             )
                         } else {
                             EmptyStateView(
@@ -703,8 +710,9 @@ fun FeePaymentFormDialog(
                         onDismissRequest = { expandedDropdown = false }
                     ) {
                         students.forEach { s ->
+                            val admInfo = if (s.joiningDate.isNotBlank()) " • Adm: ${s.joiningDate}" else ""
                             DropdownMenuItem(
-                                text = { Text("${s.name} (Roll #${s.rollNumber} - ${s.batch})") },
+                                text = { Text("${s.name} (Roll #${s.rollNumber} - ${s.batch}$admInfo)") },
                                 onClick = {
                                     selectedStudent = s
                                     if (initialPayment == null) {
@@ -714,6 +722,23 @@ fun FeePaymentFormDialog(
                                 }
                             )
                         }
+                    }
+                }
+
+                if (selectedStudent != null && !DateUtils.isStudentAdmittedInOrBefore(selectedStudent?.joiningDate, forMonthYear)) {
+                    Surface(
+                        color = Color(0xFFFEF3C7),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                    ) {
+                        Text(
+                            text = "ℹ️ Note: Student took admission in ${selectedStudent?.joiningDate}, which is after fee month $forMonthYear.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF92400E),
+                            modifier = Modifier.padding(8.dp)
+                        )
                     }
                 }
 

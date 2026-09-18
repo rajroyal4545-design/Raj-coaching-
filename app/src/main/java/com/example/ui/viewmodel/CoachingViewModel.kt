@@ -4,11 +4,15 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.AppDatabase
+import com.example.data.cloud.CloudAuthState
+import com.example.data.cloud.CloudBackupPayload
+import com.example.data.cloud.CloudSyncManager
 import com.example.data.model.AttendanceRecord
 import com.example.data.model.CoachingProfile
 import com.example.data.model.FeePayment
 import com.example.data.model.Student
 import com.example.data.repository.CoachingRepository
+import com.example.data.util.DateUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -191,7 +195,12 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
         val currentMonthPayments = payments.filter { it.forMonthYear == currentMonth }
         val collectedFee = currentMonthPayments.sumOf { it.amountPaid }
 
-        val totalExpectedFee = activeStudents.sumOf { it.monthlyFee }
+        // Only expect fee from active students admitted in or before currentMonth
+        val eligibleStudentsForMonth = activeStudents.filter { s ->
+            DateUtils.isStudentAdmittedInOrBefore(s.joiningDate, currentMonth) ||
+                currentMonthPayments.any { it.studentId == s.id }
+        }
+        val totalExpectedFee = eligibleStudentsForMonth.sumOf { it.monthlyFee }
         val pendingFee = (totalExpectedFee - collectedFee).coerceAtLeast(0.0)
 
         DashboardData(
@@ -211,13 +220,19 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
         initialValue = DashboardData()
     )
 
-    // Student Fee Summaries for the selected month
+    // Student Fee Summaries for the selected month:
+    // Only show fee for the month in which the student took admission and onwards.
     val studentFeeSummaries = combine(
         allStudents,
         paymentsForSelectedMonth,
-        allPayments
-    ) { students, monthPayments, allP ->
-        students.map { student ->
+        allPayments,
+        _selectedMonth
+    ) { students, monthPayments, allP, currentMonth ->
+        val eligibleStudents = students.filter { student ->
+            DateUtils.isStudentAdmittedInOrBefore(student.joiningDate, currentMonth) ||
+                monthPayments.any { it.studentId == student.id }
+        }
+        eligibleStudents.map { student ->
             val studentMonthPaid = monthPayments
                 .filter { it.studentId == student.id }
                 .sumOf { it.amountPaid }
@@ -364,6 +379,100 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
 
     fun getStudentPayments(studentId: Long) = repository.getPaymentsForStudent(studentId)
     fun getStudentAttendance(studentId: Long) = repository.getAttendanceForStudent(studentId)
+
+    // Cloud Authentication & Multi-Device Sync
+    private val cloudSyncManager = CloudSyncManager(application)
+    val cloudAuthState: StateFlow<CloudAuthState> = cloudSyncManager.authState
+
+    fun saveFirebaseConfig(projectId: String, apiKey: String) {
+        cloudSyncManager.saveFirebaseConfig(projectId, apiKey)
+    }
+
+    fun registerCloud(email: String, pass: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val result = cloudSyncManager.registerWithEmailPassword(email, pass)
+            result.onSuccess { msg ->
+                uploadToCloud { _, _ -> }
+                onResult(true, msg)
+            }.onFailure { err ->
+                onResult(false, err.message ?: "Registration failed")
+            }
+        }
+    }
+
+    fun loginCloud(email: String, pass: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val result = cloudSyncManager.loginWithEmailPassword(email, pass)
+            result.onSuccess { msg ->
+                downloadFromCloud { success, _ ->
+                    if (success) {
+                        onResult(true, "Login successful! Cloud database synced on this device.")
+                    } else {
+                        onResult(true, "Login successful!")
+                    }
+                }
+            }.onFailure { err ->
+                onResult(false, err.message ?: "Login failed")
+            }
+        }
+    }
+
+    fun logoutCloud() {
+        cloudSyncManager.logout()
+    }
+
+    fun uploadToCloud(onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val payload = repository.getBackupPayload()
+                val result = cloudSyncManager.uploadToCloud(payload)
+                result.onSuccess { msg ->
+                    onResult(true, msg)
+                }.onFailure { err ->
+                    onResult(false, err.message ?: "Upload failed")
+                }
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Sync error")
+            }
+        }
+    }
+
+    fun downloadFromCloud(onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val result = cloudSyncManager.downloadFromCloud()
+                result.onSuccess { payload ->
+                    repository.restoreAllData(payload)
+                    onResult(true, "Data successfully downloaded & synced from Cloud!")
+                }.onFailure { err ->
+                    onResult(false, err.message ?: "Download failed")
+                }
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Download error")
+            }
+        }
+    }
+
+    suspend fun exportBackupJson(): String {
+        val payload = repository.getBackupPayload()
+        return cloudSyncManager.exportBackupJson(payload)
+    }
+
+    fun importBackupJson(jsonString: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val result = cloudSyncManager.importBackupJson(jsonString)
+                result.onSuccess { payload ->
+                    repository.restoreAllData(payload)
+                    onResult(true, "Data restored successfully! ${payload.students.size} students loaded.")
+                }.onFailure { err ->
+                    onResult(false, err.message ?: "Invalid backup file")
+                }
+            } catch (e: Exception) {
+                onResult(false, e.localizedMessage ?: "Import error")
+            }
+        }
+    }
 }
 
 data class DashboardData(

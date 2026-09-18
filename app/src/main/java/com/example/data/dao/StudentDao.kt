@@ -14,6 +14,9 @@ interface StudentDao {
     @Query("SELECT * FROM students ORDER BY rollNumber ASC, name ASC")
     fun getAllStudents(): Flow<List<Student>>
 
+    @Query("SELECT * FROM students ORDER BY rollNumber ASC, name ASC")
+    suspend fun getAllStudentsSync(): List<Student>
+
     @Query("SELECT * FROM students WHERE id = :id LIMIT 1")
     fun getStudentById(id: Long): Flow<Student?>
 
@@ -23,6 +26,9 @@ interface StudentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(student: Student): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(students: List<Student>)
+
     @Update
     suspend fun update(student: Student)
 
@@ -31,4 +37,7 @@ interface StudentDao {
 
     @Query("DELETE FROM students WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM students")
+    suspend fun deleteAllStudents()
 }

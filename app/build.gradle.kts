@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+    id("io.github.takahirom.roborazzi")
 }
 
 android {
@@ -22,16 +23,35 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+            storeFile = file(keystorePath)
+            storePassword = System.getenv("STORE_PASSWORD")
+            keyAlias = "upload"
+            keyPassword = System.getenv("KEY_PASSWORD")
+        }
+        create("debugConfig") {
+            storeFile = file("${rootDir}/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
+            isCrunchPngs = false
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
 
         debug {
+            signingConfig = signingConfigs.getByName("debugConfig")
         }
     }
 
@@ -48,6 +68,9 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            all {
+                it.jvmArgs("-Djava.awt.headless=true")
+            }
         }
     }
 
@@ -85,6 +108,9 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.59.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.59.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-junit-rule:1.59.0")
 
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.09.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
@@ -96,4 +122,8 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     ksp("androidx.room:room-compiler:2.7.0")
+}
+
+tasks.matching { it.name.startsWith("ksp") && it.name.contains("UnitTest") }.configureEach {
+    enabled = false
 }

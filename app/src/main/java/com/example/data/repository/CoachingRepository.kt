@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import com.example.data.AppDatabase
+import com.example.data.cloud.CloudBackupPayload
 import com.example.data.model.AttendanceRecord
 import com.example.data.model.CoachingProfile
 import com.example.data.model.FeePayment
@@ -97,5 +98,35 @@ class CoachingRepository(private val database: AppDatabase) {
 
     suspend fun deleteFeePayment(payment: FeePayment) {
         feePaymentDao.delete(payment)
+    }
+
+    suspend fun getBackupPayload(): CloudBackupPayload {
+        val profile = profileDao.getProfileSync() ?: CoachingProfile()
+        val students = studentDao.getAllStudentsSync()
+        val attendance = attendanceDao.getAllAttendanceSync()
+        val payments = feePaymentDao.getAllPaymentsSync()
+        return CloudBackupPayload(
+            profile = profile,
+            students = students,
+            attendance = attendance,
+            payments = payments
+        )
+    }
+
+    suspend fun restoreAllData(payload: CloudBackupPayload) {
+        attendanceDao.deleteAllAttendance()
+        feePaymentDao.deleteAllPayments()
+        studentDao.deleteAllStudents()
+
+        profileDao.insertOrUpdate(payload.profile)
+        if (payload.students.isNotEmpty()) {
+            studentDao.insertAll(payload.students)
+        }
+        if (payload.attendance.isNotEmpty()) {
+            attendanceDao.insertOrUpdateAll(payload.attendance)
+        }
+        if (payload.payments.isNotEmpty()) {
+            feePaymentDao.insertAll(payload.payments)
+        }
     }
 }

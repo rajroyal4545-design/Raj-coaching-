@@ -29,8 +29,16 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
         run: |
-          echo "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > app/google-services.json
+          printf '%s' "$GOOGLE_SERVICES_JSON_B64" \
+            | tr -d '[:space:]' \
+            | base64 --decode > app/google-services.json
           test -s app/google-services.json
+
+      - name: Verify Firebase config
+        run: |
+          test -f app/google-services.json
+          python3 -m json.tool app/google-services.json > /dev/null
+          echo "Firebase config JSON is valid"
 
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon --stacktrace

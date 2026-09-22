@@ -49,13 +49,26 @@ class CloudSyncManager(private val context: Context) {
     val authState: StateFlow<CloudAuthState> = _authState.asStateFlow()
 
     private fun loadInitialState(): CloudAuthState {
+        val savedApiKey = prefs.getString("firebase_api_key", "") ?: ""
+        val savedProjectId = prefs.getString("firebase_project_id", "") ?: ""
+
+        val firebaseApiKey = savedApiKey.ifBlank {
+            runCatching { context.getString(com.example.R.string.google_api_key) }
+                .getOrDefault("")
+        }
+
+        val firebaseProjectId = savedProjectId.ifBlank {
+            runCatching { context.getString(com.example.R.string.project_id) }
+                .getOrDefault("")
+        }
+
         return CloudAuthState(
             isLoggedIn = prefs.getBoolean("is_logged_in", false),
             email = prefs.getString("user_email", "") ?: "",
             userId = prefs.getString("user_id", "") ?: "",
             lastSyncTime = prefs.getString("last_sync_time", "Never synced") ?: "Never synced",
-            firebaseApiKey = prefs.getString("firebase_api_key", "") ?: "",
-            firebaseProjectId = prefs.getString("firebase_project_id", "") ?: ""
+            firebaseApiKey = firebaseApiKey,
+            firebaseProjectId = firebaseProjectId
         )
     }
 

@@ -29,9 +29,12 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
         run: |
-          printf '%s' "$GOOGLE_SERVICES_JSON_B64" \
-            | tr -d '[:space:]' \
-            | base64 --decode > app/google-services.json
+          set -euo pipefail
+
+          printf '%s' "$GOOGLE_SERVICES_JSON_B64" |
+            tr -d '[:space:]' |
+            base64 --decode > app/google-services.json
+
           test -s app/google-services.json
 
       - name: Verify Firebase config
@@ -51,3 +54,4 @@ jobs:
         with:
           name: Raj-Coaching-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+

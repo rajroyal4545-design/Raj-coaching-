@@ -25,6 +25,20 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
+      - name: Check Firebase secret
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$GOOGLE_SERVICES_JSON_B64" ]; then
+            echo "ERROR: GOOGLE_SERVICES_JSON_B64 secret is EMPTY"
+            exit 1
+          fi
+
+          echo "Firebase secret is present"
+          echo "Secret length: ${#GOOGLE_SERVICES_JSON_B64}"
+
       - name: Restore Firebase config
         env:
           GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
@@ -39,19 +53,23 @@ jobs:
 
       - name: Verify Firebase config
         run: |
+          set -euo pipefail
+
           test -f app/google-services.json
           python3 -m json.tool app/google-services.json > /dev/null
+
           echo "Firebase config JSON is valid"
 
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: |
+          gradle assembleDebug --no-daemon --stacktrace
 
       - name: Show APK
-        run: find app/build/outputs -type f -name "*.apk" -print
+        run: |
+          find app/build/outputs -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Raj-Coaching-APK
           path: app/build/outputs/apk/debug/app-debug.apk
-

@@ -25,6 +25,13 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
+      - name: Restore Firebase config
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          echo "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > app/google-services.json
+          test -s app/google-services.json
+
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 
@@ -36,5 +43,3 @@ jobs:
         with:
           name: Raj-Coaching-APK
           path: app/build/outputs/apk/debug/app-debug.apk
-
-# APK build uses GitHub Actions Gradle setup

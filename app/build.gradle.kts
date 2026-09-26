@@ -1,8 +1,54 @@
+val googleServicesFile = file("google-services.json")
+if (!googleServicesFile.exists()) {
+    googleServicesFile.writeText(
+        """{
+  "project_info": {
+    "project_number": "918185425185",
+    "firebase_url": "https://coaching-manager-b876f-default-rtdb.firebaseio.com",
+    "project_id": "coaching-manager-b876f",
+    "storage_bucket": "coaching-manager-b876f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:918185425185:android:e8ef3ea0ddbd4a49666660",
+        "android_client_info": {
+          "package_name": "com.aistudio.coachingmanager.mvwkqp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "918185425185-4l1nhbril33fvjt96t2q9cj2d4rp05tj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbLHeCSOflKENOL9TQFFHdzmcMGlZdnQc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "918185425185-4l1nhbril33fvjt96t2q9cj2d4rp05tj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}"""
+    )
+}
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
-id("com.google.gms.google-services")
+    id("com.google.gms.google-services")
     id("io.github.takahirom.roborazzi")
 }
 

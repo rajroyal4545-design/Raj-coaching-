@@ -42,6 +42,8 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -74,6 +76,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -98,7 +101,6 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
 
     val cloudAuth by viewModel.cloudAuthState.collectAsState()
     var showAuthDialog by remember { mutableStateOf(false) }
-    var showCloudConfigDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -232,14 +234,6 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-
-                    IconButton(onClick = { showCloudConfigDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Cloud Settings",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
 
@@ -468,18 +462,7 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
     if (showAuthDialog) {
         CloudAuthDialog(
             viewModel = viewModel,
-            onDismiss = { showAuthDialog = false },
-            onOpenConfig = {
-                showAuthDialog = false
-                showCloudConfigDialog = true
-            }
-        )
-    }
-
-    if (showCloudConfigDialog) {
-        CloudConfigDialog(
-            viewModel = viewModel,
-            onDismiss = { showCloudConfigDialog = false }
+            onDismiss = { showAuthDialog = false }
         )
     }
 
@@ -494,8 +477,7 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
 @Composable
 fun CloudAuthDialog(
     viewModel: CoachingViewModel,
-    onDismiss: () -> Unit,
-    onOpenConfig: () -> Unit
+    onDismiss: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Login, 1: Register
     var email by remember { mutableStateOf("") }
@@ -534,31 +516,6 @@ fun CloudAuthDialog(
                         onClick = { selectedTab = 1; errorMessage = null },
                         text = { Text("Register / खाता बनाएँ") }
                     )
-                }
-
-                if (authState.firebaseApiKey.isBlank()) {
-                    Surface(
-                        color = Color(0xFFFEF3C7),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Text(
-                                text = "⚠️ Firebase Config Required",
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF92400E),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                text = "Firebase Project ID & Web API Key are needed for cloud authentication.",
-                                color = Color(0xFFB45309),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            TextButton(onClick = onOpenConfig) {
-                                Text("Configure Firebase Now / अभी सेट करें", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
                 }
 
                 OutlinedTextField(
@@ -643,82 +600,6 @@ fun CloudAuthDialog(
                             Spacer(modifier = Modifier.width(8.dp))
                         }
                         Text(if (selectedTab == 0) "Sign In" else "Create Account", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CloudConfigDialog(
-    viewModel: CoachingViewModel,
-    onDismiss: () -> Unit
-) {
-    val authState by viewModel.cloudAuthState.collectAsState()
-    var projectId by remember(authState) { mutableStateOf(authState.firebaseProjectId) }
-    var apiKey by remember(authState) { mutableStateOf(authState.firebaseApiKey) }
-    val context = LocalContext.current
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text(
-                    text = "Firebase Cloud Settings",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = "अपने Firebase Console (https://console.firebase.google.com) से Project ID और Web API Key दर्ज करें। इससे सभी डिवाइसों में डेटा सिंक होगा।",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                OutlinedTextField(
-                    value = projectId,
-                    onValueChange = { projectId = it },
-                    label = { Text("Firebase Project ID") },
-                    placeholder = { Text("e.g. my-coaching-app") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    label = { Text("Web API Key") },
-                    placeholder = { Text("AIzaSy...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            viewModel.saveFirebaseConfig(projectId.trim(), apiKey.trim())
-                            Toast.makeText(context, "Firebase configuration saved!", Toast.LENGTH_SHORT).show()
-                            onDismiss()
-                        },
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Save Config", fontWeight = FontWeight.Bold)
                     }
                 }
             }

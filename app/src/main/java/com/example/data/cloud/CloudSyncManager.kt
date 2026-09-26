@@ -43,44 +43,29 @@ data class CloudBackupPayload(
 
 class CloudSyncManager(private val context: Context) {
 
+    companion object {
+        private const val FIREBASE_API_KEY = "AIzaSyAbLHeCSOflKENOL9TQFFHdzmcMGlZdnQc"
+        private const val FIREBASE_PROJECT_ID = "coaching-manager-b876f"
+    }
+
     private val prefs: SharedPreferences = context.getSharedPreferences("coaching_cloud_prefs", Context.MODE_PRIVATE)
 
     private val _authState = MutableStateFlow(loadInitialState())
     val authState: StateFlow<CloudAuthState> = _authState.asStateFlow()
 
     private fun loadInitialState(): CloudAuthState {
-        val savedApiKey = prefs.getString("firebase_api_key", "") ?: ""
-        val savedProjectId = prefs.getString("firebase_project_id", "") ?: ""
-
-        val firebaseApiKey = savedApiKey.ifBlank {
-            runCatching { context.getString(com.example.R.string.google_api_key) }
-                .getOrDefault("")
-        }
-
-        val firebaseProjectId = savedProjectId.ifBlank {
-            runCatching { context.getString(com.example.R.string.project_id) }
-                .getOrDefault("")
-        }
-
         return CloudAuthState(
             isLoggedIn = prefs.getBoolean("is_logged_in", false),
             email = prefs.getString("user_email", "") ?: "",
             userId = prefs.getString("user_id", "") ?: "",
             lastSyncTime = prefs.getString("last_sync_time", "Never synced") ?: "Never synced",
-            firebaseApiKey = firebaseApiKey,
-            firebaseProjectId = firebaseProjectId
+            firebaseApiKey = FIREBASE_API_KEY,
+            firebaseProjectId = FIREBASE_PROJECT_ID
         )
     }
 
     fun saveFirebaseConfig(projectId: String, apiKey: String) {
-        prefs.edit()
-            .putString("firebase_project_id", projectId.trim())
-            .putString("firebase_api_key", apiKey.trim())
-            .apply()
-        _authState.value = _authState.value.copy(
-            firebaseProjectId = projectId.trim(),
-            firebaseApiKey = apiKey.trim()
-        )
+        // Kept for compatibility; credentials are fixed directly in code
     }
 
     suspend fun registerWithEmailPassword(email: String, pass: String): Result<String> = withContext(Dispatchers.IO) {

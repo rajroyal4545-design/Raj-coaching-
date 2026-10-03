@@ -4,7 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,13 +31,17 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Save
@@ -77,6 +83,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -102,6 +109,9 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
     val cloudAuth by viewModel.cloudAuthState.collectAsState()
     var showAuthDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
+    var showPrivacyPolicyDialog by remember { mutableStateOf(false) }
+    var showTermsDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(
@@ -455,6 +465,170 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
             }
         }
 
+        // About & Official Developer Section
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Header with Owner Crown Badge
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(46.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "👑", fontSize = 24.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "👑 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Official App Owner & Developer",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    IconButton(onClick = { showAboutDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "About Details",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Coaching Attendance Manager • स्मार्ट कोचिंग और ट्यूशन प्रबंधन ऐप। सभी छात्र, हाजिरी और फ़ीस रिकॉर्ड्स का सुरक्षित समाधान।",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+
+                Text(
+                    text = "Official Connect & Links / आधिकारिक संपर्क",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                // Instagram Profile Button
+                OutlinedButton(
+                    onClick = {
+                        openWebLink(context, "https://www.instagram.com/royal_ai_hub4u?stkn=MXBuMDhpMmVibjk2bw==")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFE1306C).copy(alpha = 0.5f))
+                ) {
+                    Text(text = "📸", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Instagram: @royal_ai_hub4u",
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFC13584),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = "Open Instagram",
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFFC13584)
+                    )
+                }
+
+                // Blogger Web Address Button
+                OutlinedButton(
+                    onClick = {
+                        openWebLink(context, "https://royalaihub.blogspot.com/?m=1")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFF5722).copy(alpha = 0.5f))
+                ) {
+                    Text(text = "🌐", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Website: royalaihub.blogspot.com",
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE64A19),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = "Open Blogger Web",
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFFE64A19)
+                    )
+                }
+
+                // Legal Buttons: Privacy Policy & Terms and Conditions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { showPrivacyPolicyDialog = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Privacy Policy\nगोपनीयता नीति",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Button(
+                        onClick = { showTermsDialog = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Terms & Conditions\nनियम व शर्तें",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(30.dp))
     }
 
@@ -470,6 +644,36 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
         ImportBackupDialog(
             viewModel = viewModel,
             onDismiss = { showImportDialog = false }
+        )
+    }
+
+    if (showPrivacyPolicyDialog) {
+        PrivacyPolicyDialog(
+            onDismiss = { showPrivacyPolicyDialog = false },
+            onOpenWebPolicy = {
+                openWebLink(context, "https://royalaihub.blogspot.com/?m=1")
+            }
+        )
+    }
+
+    if (showTermsDialog) {
+        TermsConditionsDialog(
+            onDismiss = { showTermsDialog = false },
+            onOpenInstagram = {
+                openWebLink(context, "https://www.instagram.com/royal_ai_hub4u?stkn=MXBuMDhpMmVibjk2bw==")
+            }
+        )
+    }
+
+    if (showAboutDialog) {
+        AboutAppDialog(
+            onDismiss = { showAboutDialog = false },
+            onOpenInstagram = {
+                openWebLink(context, "https://www.instagram.com/royal_ai_hub4u?stkn=MXBuMDhpMmVibjk2bw==")
+            },
+            onOpenBlog = {
+                openWebLink(context, "https://royalaihub.blogspot.com/?m=1")
+            }
         )
     }
 }
@@ -701,6 +905,382 @@ fun ImportBackupDialog(
                         }
                         Text("Restore Data", fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+        }
+    }
+}
+
+private fun openWebLink(context: Context, url: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "Link cannot be opened: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+    }
+}
+
+@Composable
+fun PrivacyPolicyDialog(
+    onDismiss: () -> Unit,
+    onOpenWebPolicy: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Privacy Policy / गोपनीयता नीति",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Owner: 👑 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "👑 Owner: 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "🌐 Website: https://royalaihub.blogspot.com",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "📸 Instagram: @royal_ai_hub4u",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
+                Text(
+                    text = "1. Data Collection & Privacy / डेटा सुरक्षा",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "This Coaching Attendance Manager application respects user privacy. All coaching records—including student profiles, phone numbers, attendance logs, and fee payment histories—are stored locally on your device in an isolated SQLite database. We do not sell, share, or monetize any of your data.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "2. Multi-Device Cloud Sync / क्लाउड सिंक",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "When you choose to register and login for Multi-Device Cloud Sync, data is transmitted over secure SSL/TLS (HTTPS) to your Firebase Realtime Database. Cloud sync is completely optional and user-controlled.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "3. User Control & Data Export / डेटा पर पूर्ण नियंत्रण",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "You maintain 100% control over your coaching information. You can export complete offline JSON backups, import backups across devices, or wipe data at your discretion.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "4. Publisher & Inquiries / संपर्क",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Published by 👑 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔. For questions, suggestions, or privacy requests, visit our official blog or Instagram page.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onOpenWebPolicy) {
+                        Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Visit Website", fontSize = 12.sp)
+                    }
+                    Button(onClick = onDismiss, shape = RoundedCornerShape(10.dp)) {
+                        Text("Close / बंद करें", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TermsConditionsDialog(
+    onDismiss: () -> Unit,
+    onOpenInstagram: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Description,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Terms & Conditions / नियम व शर्तें",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Owner: 👑 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "👑 Owner & Creator: 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "🌐 Website: https://royalaihub.blogspot.com",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "📸 Instagram: @royal_ai_hub4u",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
+                Text(
+                    text = "1. Agreement to Terms / नियम सहमति",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "By installing and utilizing Coaching Attendance Manager, you accept and agree to comply with these Terms & Conditions. The application is tailored for tutors, coaching institutes, schools, and teachers for day-to-day administrative tracking.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "2. Intellectual Property Rights / बौद्धिक संपदा अधिकार",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "All branding, design assets, and source code are the intellectual property of 👑 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔. Any unauthorized duplication, redistribution, or modification without written permission is strictly prohibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "3. Backup Responsibility / बैकअप ज़िम्मेदारी",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "While the app safeguards data through local SQLite and cloud sync, users are encouraged to perform regular offline exports (JSON) via Settings to ensure no disruption in case of device replacement or loss.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "4. Support & Communication / सहायता",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "For inquiries, technical queries, or feedback, you can connect with us directly via our official Instagram handle or Blogger website.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onOpenInstagram) {
+                        Text(text = "📸", fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Instagram", fontSize = 12.sp)
+                    }
+                    Button(onClick = onDismiss, shape = RoundedCornerShape(10.dp)) {
+                        Text("Close / बंद करें", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AboutAppDialog(
+    onDismiss: () -> Unit,
+    onOpenInstagram: () -> Unit,
+    onOpenBlog: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(60.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(text = "👑", fontSize = 32.sp)
+                    }
+                }
+
+                Text(
+                    text = "👑 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Text(
+                    text = "Coaching Attendance Manager\nVersion 1.0.0",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "✨ App Highlights:",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "• 100% Offline SQLite database for student attendance and fees\n• Multi-Device Firebase sync for access across all your phones\n• Monthly fee receipts, WhatsApp reminders, and PDF export\n• Zero data selling; complete user privacy",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onOpenInstagram,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("📸 Instagram", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = onOpenBlog,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("🌐 Website", fontSize = 12.sp)
+                    }
+                }
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Close", fontWeight = FontWeight.Bold)
                 }
             }
         }

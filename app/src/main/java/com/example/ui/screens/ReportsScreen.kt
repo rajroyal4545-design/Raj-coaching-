@@ -110,6 +110,25 @@ enum class ReportSort(val label: String) {
     ROLL_NUMBER("Roll No. / रोल नंबर")
 }
 
+/**
+ * Clean data holder for student reporting metrics, including cumulative back-months dues.
+ */
+data class StudentReportData(
+    val student: Student,
+    val presentCount: Int,
+    val absentCount: Int,
+    val leaveCount: Int,
+    val totalSessions: Int,
+    val attendancePercent: Int,
+    val expectedFee: Double,
+    val paidFee: Double,
+    val dueFee: Double, // Cumulative due (all back months + current month)
+    val previousMonthsDue: Double = 0.0, // Due strictly from back/past months
+    val currentMonthDue: Double = 0.0, // Due strictly from selected month
+    val backMonthsCount: Int = 0,
+    val isPaidInFull: Boolean
+)
+
 @Composable
 fun ReportsScreen(viewModel: CoachingViewModel) {
     val context = LocalContext.current
@@ -141,7 +160,6 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
 
     // Active attendance & payments depending on scope
     val effectiveAttendance = if (selectedScope == ReportScope.MONTHLY) monthAttendance else allAttendance
-    val effectivePayments = if (selectedScope == ReportScope.MONTHLY) monthPayments else allPayments
 
     // Eligible students for the scope
     val eligibleStudents = remember(allStudents, selectedMonth, selectedScope, monthPayments) {
@@ -155,21 +173,8 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
         }
     }
 
-    // Pre-calculate per-student metrics
-    data class StudentReportData(
-        val student: Student,
-        val presentCount: Int,
-        val absentCount: Int,
-        val leaveCount: Int,
-        val totalSessions: Int,
-        val attendancePercent: Int,
-        val expectedFee: Double,
-        val paidFee: Double,
-        val dueFee: Double,
-        val isPaidInFull: Boolean
-    )
-
-    val studentDataList = remember(eligibleStudents, effectiveAttendance, effectivePayments, selectedScope, selectedMonth) {
+    // Pre-calculate per-student metrics with cumulative back-month dues
+    val studentDataList = remember(eligibleStudents, effectiveAttendance, allPayments, monthPayments, selectedScope, selectedMonth) {
         eligibleStudents.map { s ->
             val att = effectiveAttendance.filter { it.studentId == s.id }
             val pCount = att.count { it.status == "PRESENT" }
@@ -178,16 +183,51 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
             val markedTotal = pCount + aCount
             val attPct = if (markedTotal > 0) ((pCount.toDouble() / markedTotal) * 100).toInt() else 0
 
-            val studentPayments = effectivePayments.filter { it.studentId == s.id }
-            val paid = studentPayments.sumOf { it.amountPaid }
-
-            val expected = if (selectedScope == ReportScope.MONTHLY) {
-                s.monthlyFee
-            } else {
-                // If all time, at least total paid or current fee
-                maxOf(s.monthlyFee, paid)
+            val admissionMonth = DateUtils.extractMonthYear(s.joiningDate)
+            val earliestP = allPayments.filter { it.studentId == s.id }.minOfOrNull { it.forMonthYear }
+            val startMonth = when {
+                admissionMonth != null && earliestP != null -> minOf(admissionMonth, earliestP)
+                admissionMonth != null -> admissionMonth
+                earliestP != null -> earliestP
+                else -> selectedMonth
             }
-            val due = (expected - paid).coerceAtLeast(0.0)
+
+            val monthsUpToCurrent = DateUtils.getMonthsList(startMonth, selectedMonth)
+            val pastMonths = monthsUpToCurrent.filter { it < selectedMonth }
+
+            val pastExpected = pastMonths.size * s.monthlyFee
+            val pastPaid = allPayments
+                .filter { it.studentId == s.id && it.forMonthYear < selectedMonth }
+                .sumOf { it.amountPaid }
+            val pastDue = (pastExpected - pastPaid).coerceAtLeast(0.0)
+            val pastAdvance = (pastPaid - pastExpected).coerceAtLeast(0.0)
+
+            val studentMonthPaid = monthPayments
+                .filter { it.studentId == s.id }
+                .sumOf { it.amountPaid }
+            val effectiveMonthPaid = studentMonthPaid + pastAdvance
+            val pendingCurrentMonth = (s.monthlyFee - effectiveMonthPaid).coerceAtLeast(0.0)
+
+            val totalDue: Double
+            val expectedFee: Double
+            val paidFee: Double
+            val backMonthsCount: Int
+
+            if (selectedScope == ReportScope.MONTHLY) {
+                totalDue = pastDue + pendingCurrentMonth
+                expectedFee = (pastMonths.size + 1) * s.monthlyFee
+                paidFee = pastPaid + studentMonthPaid
+                backMonthsCount = if (pastDue > 0.0 && s.monthlyFee > 0.0) {
+                    Math.ceil(pastDue / s.monthlyFee).toInt().coerceAtMost(pastMonths.size)
+                } else 0
+            } else {
+                // ALL_TIME Scope
+                val allActiveMonths = monthsUpToCurrent
+                expectedFee = allActiveMonths.size * s.monthlyFee
+                paidFee = allPayments.filter { it.studentId == s.id }.sumOf { it.amountPaid }
+                totalDue = (expectedFee - paidFee).coerceAtLeast(0.0)
+                backMonthsCount = 0
+            }
 
             StudentReportData(
                 student = s,
@@ -196,10 +236,13 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
                 leaveCount = lCount,
                 totalSessions = markedTotal,
                 attendancePercent = attPct,
-                expectedFee = expected,
-                paidFee = paid,
-                dueFee = due,
-                isPaidInFull = due <= 0.0
+                expectedFee = expectedFee,
+                paidFee = paidFee,
+                dueFee = totalDue,
+                previousMonthsDue = pastDue,
+                currentMonthDue = pendingCurrentMonth,
+                backMonthsCount = backMonthsCount,
+                isPaidInFull = totalDue <= 0.0
             )
         }
     }
@@ -210,7 +253,7 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
     val totalAbsentSum = studentDataList.sumOf { it.absentCount }
     val totalExpectedSum = studentDataList.sumOf { it.expectedFee }
     val totalPaidSum = studentDataList.sumOf { it.paidFee }
-    val totalDueSum = (totalExpectedSum - totalPaidSum).coerceAtLeast(0.0)
+    val totalDueSum = studentDataList.sumOf { it.dueFee }
     val avgAttendancePct = if (totalPresentSum + totalAbsentSum > 0) {
         ((totalPresentSum.toDouble() / (totalPresentSum + totalAbsentSum)) * 100).toInt()
     } else 0
@@ -300,7 +343,7 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = if (selectedScope == ReportScope.MONTHLY) "Selected: $selectedMonth" else "All recorded data (${profile.coachingName})",
+                                text = if (selectedScope == ReportScope.MONTHLY) "Month: $selectedMonth (पिछला बकाया शामिल)" else "All recorded data (${profile.coachingName})",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
@@ -319,14 +362,18 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
                                     appendLine("📈 Avg Attendance: $avgAttendancePct%")
                                     appendLine("💰 Total Fee: $currency ${String.format(Locale.US, "%,.0f", totalExpectedSum)}")
                                     appendLine("💵 Total Paid: $currency ${String.format(Locale.US, "%,.0f", totalPaidSum)}")
-                                    appendLine("⚠️ Total Due: $currency ${String.format(Locale.US, "%,.0f", totalDueSum)}")
+                                    appendLine("⚠️ Total Due (सब मिलाकर): $currency ${String.format(Locale.US, "%,.0f", totalDueSum)}")
                                     appendLine("=================================")
-                                    appendLine("STUDENT DETAILS (Present / Paid / Due):")
+                                    appendLine("STUDENT DETAILS (Present / Paid / Total Due):")
                                     filteredStudents.forEach { data ->
                                         val s = data.student
                                         appendLine("• ${s.name} (Roll #${s.rollNumber}, ${s.batch})")
                                         appendLine("  Att: ${data.presentCount}P / ${data.absentCount}A (${data.attendancePercent}%)")
-                                        appendLine("  Fee: $currency${data.expectedFee.toInt()} | Paid: $currency${data.paidFee.toInt()} | Due: $currency${data.dueFee.toInt()}")
+                                        if (data.previousMonthsDue > 0.0) {
+                                            appendLine("  Fee: $currency${s.monthlyFee.toInt()} | Paid: $currency${data.paidFee.toInt()} | Due: $currency${data.dueFee.toInt()} (पिछला: $currency${data.previousMonthsDue.toInt()} + इस माह: $currency${data.currentMonthDue.toInt()})")
+                                        } else {
+                                            appendLine("  Fee: $currency${s.monthlyFee.toInt()} | Paid: $currency${data.paidFee.toInt()} | Due: $currency${data.dueFee.toInt()}")
+                                        }
                                     }
                                 }
                                 val sendIntent = Intent().apply {
@@ -404,7 +451,7 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
             }
         }
 
-        // 3. Executive KPI Overview Cards (Attendance & Payment Summary)
+        // 3. Executive KPI Overview Cards (Attendance & Payment Summary with Cumulative Dues)
         item {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -431,14 +478,14 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
 
                     Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                    // Fees KPI row (Paid & Due highlighted)
+                    // Fees KPI row (Paid & Cumulative Due highlighted)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        ReportSummaryItem("Total Fee", "$currency ${String.format(Locale.US, "%,.0f", totalExpectedSum)}")
+                        ReportSummaryItem("Total Expected", "$currency ${String.format(Locale.US, "%,.0f", totalExpectedSum)}")
                         ReportSummaryItem("Total Paid (जमा)", "$currency ${String.format(Locale.US, "%,.0f", totalPaidSum)}", PresentGreen)
-                        ReportSummaryItem("Total Due (बकाया)", "$currency ${String.format(Locale.US, "%,.0f", totalDueSum)}", if (totalDueSum > 0) AbsentRed else Color.Gray)
+                        ReportSummaryItem("Total Due (कुल बकाया)", "$currency ${String.format(Locale.US, "%,.0f", totalDueSum)}", if (totalDueSum > 0) AbsentRed else Color.Gray)
                     }
                 }
             }
@@ -546,7 +593,7 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
             }
         }
 
-        // 5. Student List (Showing Total Present, Total Paid, and Due Amount)
+        // 5. Student List (Showing Total Present, Total Paid, and Cumulative Back Months Due)
         if (filteredStudents.isEmpty()) {
             item {
                 Card(
@@ -602,12 +649,12 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
         )
     }
 
-    // Quick Fee Payment Dialog
+    // Quick Fee Payment Dialog (Defaults to student's total cumulative due!)
     studentForPayment?.let { student ->
         val data = studentDataList.find { it.student.id == student.id }
         val dueAmount = data?.dueFee ?: 0.0
 
-        FeePaymentFormDialog(
+        com.example.ui.screens.FeePaymentFormDialog(
             initialPayment = null,
             students = allStudents,
             preselectedStudent = student,
@@ -625,7 +672,7 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
     // Student Details & History Dialog
     studentForDetails?.let { student ->
         val data = studentDataList.find { it.student.id == student.id }
-        val studentPayments = effectivePayments.filter { it.studentId == student.id }
+        val studentPayments = allPayments.filter { it.studentId == student.id }
 
         StudentReportDetailDialog(
             student = student,
@@ -643,52 +690,18 @@ fun ReportsScreen(viewModel: CoachingViewModel) {
 }
 
 /**
- * Individual Student Report Card displaying Attendance (Present/Absent) and Payment (Paid/Due).
+ * Individual Student Report Card displaying Attendance (Present/Absent) and Payment (Paid/Total Due including back months).
  */
 @Composable
 fun StudentReportCard(
-    data: Any,
+    data: StudentReportData,
     currency: String,
     periodLabel: String,
     coachingName: String,
     onCollectFee: () -> Unit,
     onViewDetails: () -> Unit
 ) {
-    // Reflection-free dynamic mapping
-    val student: Student
-    val presentCount: Int
-    val absentCount: Int
-    val leaveCount: Int
-    val attendancePercent: Int
-    val expectedFee: Double
-    val paidFee: Double
-    val dueFee: Double
-    val isPaidInFull: Boolean
-
-    try {
-        val sField = data.javaClass.getDeclaredField("student").apply { isAccessible = true }
-        val pField = data.javaClass.getDeclaredField("presentCount").apply { isAccessible = true }
-        val aField = data.javaClass.getDeclaredField("absentCount").apply { isAccessible = true }
-        val lField = data.javaClass.getDeclaredField("leaveCount").apply { isAccessible = true }
-        val pctField = data.javaClass.getDeclaredField("attendancePercent").apply { isAccessible = true }
-        val expField = data.javaClass.getDeclaredField("expectedFee").apply { isAccessible = true }
-        val paidField = data.javaClass.getDeclaredField("paidFee").apply { isAccessible = true }
-        val dueField = data.javaClass.getDeclaredField("dueFee").apply { isAccessible = true }
-        val isPaidField = data.javaClass.getDeclaredField("isPaidInFull").apply { isAccessible = true }
-
-        student = sField.get(data) as Student
-        presentCount = pField.getInt(data)
-        absentCount = aField.getInt(data)
-        leaveCount = lField.getInt(data)
-        attendancePercent = pctField.getInt(data)
-        expectedFee = expField.getDouble(data)
-        paidFee = paidField.getDouble(data)
-        dueFee = dueField.getDouble(data)
-        isPaidInFull = isPaidField.getBoolean(data)
-    } catch (_: Exception) {
-        return
-    }
-
+    val student = data.student
     val context = LocalContext.current
 
     ElevatedCard(
@@ -727,8 +740,8 @@ fun StudentReportCard(
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = when {
-                        isPaidInFull -> Color(0xFFDCFCE7)
-                        paidFee > 0 -> Color(0xFFFEF3C7)
+                        data.isPaidInFull -> Color(0xFFDCFCE7)
+                        data.paidFee > 0 -> Color(0xFFFEF3C7)
                         else -> Color(0xFFFEE2E2)
                     }
                 ) {
@@ -738,15 +751,15 @@ fun StudentReportCard(
                     ) {
                         Text(
                             text = when {
-                                isPaidInFull -> "PAID / चुकता"
-                                paidFee > 0 -> "PARTIAL / आंशिक"
+                                data.isPaidInFull -> "PAID / चुकता"
+                                data.paidFee > 0 -> "PARTIAL / आंशिक"
                                 else -> "DUE / बकाया"
                             },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = when {
-                                isPaidInFull -> PresentGreen
-                                paidFee > 0 -> WarningAmber
+                                data.isPaidInFull -> PresentGreen
+                                data.paidFee > 0 -> WarningAmber
                                 else -> AbsentRed
                             }
                         )
@@ -761,7 +774,7 @@ fun StudentReportCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Left Column: Total Present & Attendance Stats (Green/Teal Theme)
+                // Left Column: Total Present & Attendance Stats (Green Theme)
                 Surface(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
@@ -782,13 +795,13 @@ fun StudentReportCard(
                             )
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = if (attendancePercent >= 75) PresentGreen.copy(alpha = 0.15f) else AbsentRed.copy(alpha = 0.15f)
+                                color = if (data.attendancePercent >= 75) PresentGreen.copy(alpha = 0.15f) else AbsentRed.copy(alpha = 0.15f)
                             ) {
                                 Text(
-                                    text = "$attendancePercent%",
+                                    text = "${data.attendancePercent}%",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (attendancePercent >= 75) PresentGreen else AbsentRed,
+                                    color = if (data.attendancePercent >= 75) PresentGreen else AbsentRed,
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                 )
                             }
@@ -798,7 +811,7 @@ fun StudentReportCard(
 
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
-                                text = "$presentCount",
+                                text = "${data.presentCount}",
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = PresentGreen
@@ -816,7 +829,7 @@ fun StudentReportCard(
 
                         // Absent & Leave subtext
                         Text(
-                            text = "❌ Absent: $absentCount  •  🏖️ Leave: $leaveCount",
+                            text = "❌ Absent: ${data.absentCount}  •  🏖️ Leave: ${data.leaveCount}",
                             fontSize = 10.sp,
                             color = Color(0xFF4B5563)
                         )
@@ -824,23 +837,23 @@ fun StudentReportCard(
                         Spacer(modifier = Modifier.height(6.dp))
 
                         LinearProgressIndicator(
-                            progress = { (attendancePercent / 100f).coerceIn(0f, 1f) },
+                            progress = { (data.attendancePercent / 100f).coerceIn(0f, 1f) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp)),
-                            color = if (attendancePercent >= 75) PresentGreen else WarningAmber,
+                            color = if (data.attendancePercent >= 75) PresentGreen else WarningAmber,
                             trackColor = Color(0xFFDCFCE7)
                         )
                     }
                 }
 
-                // Right Column: Payment Details (Total Fee, Paid, Due)
+                // Right Column: Payment Details (Total Fee, Paid, and Cumulative Back Months Due)
                 Surface(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    color = if (dueFee > 0) Color(0xFFFFFBEB) else Color(0xFFF8FAFC),
-                    border = BorderStroke(1.dp, if (dueFee > 0) Color(0xFFFDE68A) else Color(0xFFE2E8F0))
+                    color = if (data.dueFee > 0) Color(0xFFFFFBEB) else Color(0xFFF8FAFC),
+                    border = BorderStroke(1.dp, if (data.dueFee > 0) Color(0xFFFDE68A) else Color(0xFFE2E8F0))
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
                         Row(
@@ -852,10 +865,10 @@ fun StudentReportCard(
                                 text = "PAYMENT DETAILS",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (dueFee > 0) Color(0xFF92400E) else Color(0xFF475569)
+                                color = if (data.dueFee > 0) Color(0xFF92400E) else Color(0xFF475569)
                             )
                             Text(
-                                text = "Fee: $currency${expectedFee.toInt()}",
+                                text = "Fee: $currency${student.monthlyFee.toInt()}",
                                 fontSize = 10.sp,
                                 color = Color(0xFF64748B)
                             )
@@ -871,7 +884,7 @@ fun StudentReportCard(
                                 color = Color(0xFF475569)
                             )
                             Text(
-                                text = "$currency ${String.format(Locale.US, "%,.0f", paidFee)}",
+                                text = "$currency ${String.format(Locale.US, "%,.0f", data.paidFee)}",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = PresentGreen
@@ -880,30 +893,40 @@ fun StudentReportCard(
 
                         Spacer(modifier = Modifier.height(2.dp))
 
-                        // Due amount
+                        // Total Due amount (All back months + current month)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Due (बकाया): ",
+                                text = "Total Due (बकाया): ",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (dueFee > 0) AbsentRed else Color(0xFF475569)
+                                color = if (data.dueFee > 0) AbsentRed else Color(0xFF475569)
                             )
                             Text(
-                                text = if (dueFee > 0) "$currency ${String.format(Locale.US, "%,.0f", dueFee)}" else "₹0 (Nil)",
+                                text = if (data.dueFee > 0) "$currency ${String.format(Locale.US, "%,.0f", data.dueFee)}" else "₹0 (Nil)",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = if (dueFee > 0) AbsentRed else PresentGreen
+                                color = if (data.dueFee > 0) AbsentRed else PresentGreen
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                        Text(
-                            text = if (dueFee > 0) "⚠️ ${currency}${dueFee.toInt()} Pending" else "✓ No pending dues",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (dueFee > 0) AbsentRed else PresentGreen
-                        )
+                        // Back months breakdown indication
+                        if (data.previousMonthsDue > 0.0) {
+                            Text(
+                                text = "⚠️ पिछला: $currency${data.previousMonthsDue.toInt()} + इस माह: $currency${data.currentMonthDue.toInt()}",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AbsentRed
+                            )
+                        } else {
+                            Text(
+                                text = if (data.dueFee > 0) "⚠️ ${currency}${data.dueFee.toInt()} Pending" else "✓ No pending dues",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (data.dueFee > 0) AbsentRed else PresentGreen
+                            )
+                        }
                     }
                 }
             }
@@ -920,18 +943,21 @@ fun StudentReportCard(
                 OutlinedButton(
                     onClick = {
                         val message = buildString {
-                            appendLine("नमस्ते! ${coachingName} से छात्र विवरण:")
+                            appendLine("नमस्ते! ${coachingName} से छात्र फीस व हाजिरी विवरण:")
                             appendLine("👤 छात्र का नाम: ${student.name}")
                             appendLine("📋 रोल नंबर: ${student.rollNumber} (${student.batch})")
                             appendLine("📅 अवधि: $periodLabel")
                             appendLine("---------------------------")
-                            appendLine("✅ कुल उपस्थिति (Present): $presentCount दिन ($attendancePercent%)")
-                            appendLine("❌ कुल अनुपस्थिति (Absent): $absentCount दिन")
+                            appendLine("✅ कुल उपस्थिति (Present): ${data.presentCount} दिन (${data.attendancePercent}%)")
+                            appendLine("❌ कुल अनुपस्थिति (Absent): ${data.absentCount} दिन")
                             appendLine("---------------------------")
-                            appendLine("💰 निर्धारित फीस: $currency${expectedFee.toInt()}")
-                            appendLine("💵 कुल जमा (Paid): $currency${paidFee.toInt()}")
-                            appendLine("⚠️ कुल बकाया (Due): $currency${dueFee.toInt()}")
-                            if (dueFee > 0) {
+                            appendLine("💰 निर्धारित मासिक फीस: $currency${student.monthlyFee.toInt()}")
+                            appendLine("💵 कुल जमा (Paid): $currency${data.paidFee.toInt()}")
+                            appendLine("⚠️ कुल बकाया (Total Due): $currency${data.dueFee.toInt()}")
+                            if (data.previousMonthsDue > 0.0) {
+                                appendLine("👉 (पिछले ${data.backMonthsCount} माह का बकाया: $currency${data.previousMonthsDue.toInt()} + इस माह: $currency${data.currentMonthDue.toInt()})")
+                                appendLine("कृपया पिछले महीनों का कुल बकाया जल्द से जल्द जमा कराने का कष्ट करें।")
+                            } else if (data.dueFee > 0) {
                                 appendLine("कृपया बकाया फीस समय पर जमा करने की कृपा करें।")
                             } else {
                                 appendLine("फीस पूर्ण रूप से जमा है। धन्यवाद!")
@@ -952,7 +978,6 @@ fun StudentReportCard(
                         try {
                             context.startActivity(intent)
                         } catch (_: Exception) {
-                            // Fallback to general share intent
                             val sendIntent = Intent().apply {
                                 action = Intent.ACTION_SEND
                                 putExtra(Intent.EXTRA_TEXT, message)
@@ -969,7 +994,7 @@ fun StudentReportCard(
                 }
 
                 // If fee is due, show prominent "Pay Fee" button
-                if (dueFee > 0) {
+                if (data.dueFee > 0) {
                     Button(
                         onClick = onCollectFee,
                         modifier = Modifier.weight(1f),
@@ -1025,41 +1050,22 @@ fun StudentReportCard(
 @Composable
 fun StudentReportDetailDialog(
     student: Student,
-    data: Any?,
+    data: StudentReportData?,
     payments: List<FeePayment>,
     currency: String,
     scopeLabel: String,
     onDismiss: () -> Unit,
     onCollectFee: () -> Unit
 ) {
-    var presentCount = 0
-    var absentCount = 0
-    var leaveCount = 0
-    var attendancePercent = 0
-    var expectedFee = 0.0
-    var paidFee = 0.0
-    var dueFee = 0.0
-
-    if (data != null) {
-        try {
-            val pField = data.javaClass.getDeclaredField("presentCount").apply { isAccessible = true }
-            val aField = data.javaClass.getDeclaredField("absentCount").apply { isAccessible = true }
-            val lField = data.javaClass.getDeclaredField("leaveCount").apply { isAccessible = true }
-            val pctField = data.javaClass.getDeclaredField("attendancePercent").apply { isAccessible = true }
-            val expField = data.javaClass.getDeclaredField("expectedFee").apply { isAccessible = true }
-            val paidField = data.javaClass.getDeclaredField("paidFee").apply { isAccessible = true }
-            val dueField = data.javaClass.getDeclaredField("dueFee").apply { isAccessible = true }
-
-            presentCount = pField.getInt(data)
-            absentCount = aField.getInt(data)
-            leaveCount = lField.getInt(data)
-            attendancePercent = pctField.getInt(data)
-            expectedFee = expField.getDouble(data)
-            paidFee = paidField.getDouble(data)
-            dueFee = dueField.getDouble(data)
-        } catch (_: Exception) {
-        }
-    }
+    val presentCount = data?.presentCount ?: 0
+    val absentCount = data?.absentCount ?: 0
+    val leaveCount = data?.leaveCount ?: 0
+    val attendancePercent = data?.attendancePercent ?: 0
+    val expectedFee = data?.expectedFee ?: student.monthlyFee
+    val paidFee = data?.paidFee ?: 0.0
+    val dueFee = data?.dueFee ?: 0.0
+    val prevDue = data?.previousMonthsDue ?: 0.0
+    val curDue = data?.currentMonthDue ?: 0.0
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1121,9 +1127,45 @@ fun StudentReportDetailDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    ReportSummaryItem("Total Fee", "$currency ${expectedFee.toInt()}")
+                    ReportSummaryItem("Expected", "$currency ${expectedFee.toInt()}")
                     ReportSummaryItem("Paid (जमा)", "$currency ${paidFee.toInt()}", PresentGreen)
-                    ReportSummaryItem("Due (बकाया)", "$currency ${dueFee.toInt()}", if (dueFee > 0) AbsentRed else PresentGreen)
+                    ReportSummaryItem("Due (कुल बकाया)", "$currency ${dueFee.toInt()}", if (dueFee > 0) AbsentRed else PresentGreen)
+                }
+
+                // Back months breakdown callout if past due exists
+                if (prevDue > 0.0) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFEF2F2),
+                        border = BorderStroke(1.dp, Color(0xFFFECACA)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "बकाया का विवरण (Due Breakdown):",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AbsentRed
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "• पिछले महीनों का बकाया: $currency ${String.format(Locale.US, "%,.0f", prevDue)}",
+                                fontSize = 11.sp,
+                                color = AbsentRed
+                            )
+                            Text(
+                                text = "• इस माह का बकाया: $currency ${String.format(Locale.US, "%,.0f", curDue)}",
+                                fontSize = 11.sp,
+                                color = AbsentRed
+                            )
+                            Text(
+                                text = "• कुल मिलाकर बकाया राशि: $currency ${String.format(Locale.US, "%,.0f", dueFee)}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AbsentRed
+                            )
+                        }
+                    }
                 }
 
                 Divider()

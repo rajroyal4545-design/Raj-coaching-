@@ -73,4 +73,24 @@ object DateUtils {
             monthYear
         }
     }
+
+    /**
+     * Returns an ordered list of "YYYY-MM" strings from fromMonth up to toMonth (inclusive).
+     * Capped at 48 months to prevent runaway loops.
+     */
+    fun getMonthsList(fromMonth: String, toMonth: String): List<String> {
+        if (fromMonth > toMonth) {
+            return listOf(toMonth)
+        }
+        val result = mutableListOf<String>()
+        var current = fromMonth
+        var safetyCounter = 0
+        while (current <= toMonth && safetyCounter < 48) {
+            result.add(current)
+            if (current == toMonth) break
+            current = getAdjacentMonth(current, 1)
+            safetyCounter++
+        }
+        return if (result.isEmpty()) listOf(toMonth) else result
+    }
 }

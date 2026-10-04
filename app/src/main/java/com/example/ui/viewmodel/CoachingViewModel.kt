@@ -32,8 +32,11 @@ data class StudentFeeSummary(
     val student: Student,
     val totalPaidForMonth: Double,
     val pendingForMonth: Double,
+    val previousMonthsDue: Double = 0.0,
+    val totalCumulativeDue: Double = pendingForMonth + previousMonthsDue,
     val totalLifetimePaid: Double,
-    val isPaidInFull: Boolean
+    val isPaidInFull: Boolean,
+    val backMonthsCount: Int = 0
 )
 
 data class StudentAttendanceSummary(
@@ -208,8 +211,27 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
             DateUtils.isStudentAdmittedInOrBefore(s.joiningDate, currentMonth) ||
                 currentMonthPayments.any { it.studentId == s.id }
         }
-        val totalExpectedFee = eligibleStudentsForMonth.sumOf { it.monthlyFee }
-        val pendingFee = (totalExpectedFee - collectedFee).coerceAtLeast(0.0)
+
+        // Cumulative pending fee across all active students including back months
+        var totalCumulativePendingFee = 0.0
+        var totalExpectedFeeAll = 0.0
+
+        eligibleStudentsForMonth.forEach { student ->
+            val admissionMonth = DateUtils.extractMonthYear(student.joiningDate)
+            val earliestP = payments.filter { it.studentId == student.id }.minOfOrNull { it.forMonthYear }
+            val startMonth = when {
+                admissionMonth != null && earliestP != null -> minOf(admissionMonth, earliestP)
+                admissionMonth != null -> admissionMonth
+                earliestP != null -> earliestP
+                else -> currentMonth
+            }
+            val activeMonths = DateUtils.getMonthsList(startMonth, currentMonth)
+            val expected = activeMonths.size * student.monthlyFee
+            val paid = payments.filter { it.studentId == student.id && it.forMonthYear <= currentMonth }.sumOf { it.amountPaid }
+            val studentTotalDue = (expected - paid).coerceAtLeast(0.0)
+            totalCumulativePendingFee += studentTotalDue
+            totalExpectedFeeAll += expected
+        }
 
         DashboardData(
             totalStudents = totalStudentsCount,
@@ -219,8 +241,8 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
             isTodayClosed = isClosed,
             todayUnmarked = unmarkedCount,
             currentMonthCollection = collectedFee,
-            totalExpectedFee = totalExpectedFee,
-            pendingFeeAmount = pendingFee
+            totalExpectedFee = totalExpectedFeeAll,
+            pendingFeeAmount = totalCumulativePendingFee
         )
     }.stateIn(
         scope = viewModelScope,
@@ -230,6 +252,7 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
 
     // Student Fee Summaries for the selected month:
     // Only show fee for the month in which the student took admission and onwards.
+    // Dues from all previous months are aggregated cumulatively into totalCumulativeDue.
     val studentFeeSummaries = combine(
         allStudents,
         paymentsForSelectedMonth,
@@ -241,19 +264,48 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
                 monthPayments.any { it.studentId == student.id }
         }
         eligibleStudents.map { student ->
+            val admissionMonth = DateUtils.extractMonthYear(student.joiningDate)
+            val earliestP = allP.filter { it.studentId == student.id }.minOfOrNull { it.forMonthYear }
+            val startMonth = when {
+                admissionMonth != null && earliestP != null -> minOf(admissionMonth, earliestP)
+                admissionMonth != null -> admissionMonth
+                earliestP != null -> earliestP
+                else -> currentMonth
+            }
+            val monthsUpToCurrent = DateUtils.getMonthsList(startMonth, currentMonth)
+            val pastMonths = monthsUpToCurrent.filter { it < currentMonth }
+
+            val pastExpected = pastMonths.size * student.monthlyFee
+            val pastPaid = allP
+                .filter { it.studentId == student.id && it.forMonthYear < currentMonth }
+                .sumOf { it.amountPaid }
+            val pastDue = (pastExpected - pastPaid).coerceAtLeast(0.0)
+            val pastAdvance = (pastPaid - pastExpected).coerceAtLeast(0.0)
+
             val studentMonthPaid = monthPayments
                 .filter { it.studentId == student.id }
                 .sumOf { it.amountPaid }
+            val effectiveMonthPaid = studentMonthPaid + pastAdvance
+            val pendingCurrentMonth = (student.monthlyFee - effectiveMonthPaid).coerceAtLeast(0.0)
+
+            val totalDue = pastDue + pendingCurrentMonth
             val studentLifetimePaid = allP
                 .filter { it.studentId == student.id }
                 .sumOf { it.amountPaid }
-            val pending = (student.monthlyFee - studentMonthPaid).coerceAtLeast(0.0)
+
+            val backMonthsCount = if (pastDue > 0.0 && student.monthlyFee > 0.0) {
+                Math.ceil(pastDue / student.monthlyFee).toInt().coerceAtMost(pastMonths.size)
+            } else 0
+
             StudentFeeSummary(
                 student = student,
                 totalPaidForMonth = studentMonthPaid,
-                pendingForMonth = pending,
+                pendingForMonth = pendingCurrentMonth,
+                previousMonthsDue = pastDue,
+                totalCumulativeDue = totalDue,
                 totalLifetimePaid = studentLifetimePaid,
-                isPaidInFull = studentMonthPaid >= student.monthlyFee
+                isPaidInFull = totalDue <= 0.0,
+                backMonthsCount = backMonthsCount
             )
         }
     }.stateIn(

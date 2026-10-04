@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -112,7 +113,7 @@ fun FeesScreen(viewModel: CoachingViewModel) {
     var activeSlipData by remember { mutableStateOf<SlipViewData?>(null) }
 
     val totalCollected = feeSummaries.sumOf { it.totalPaidForMonth }
-    val totalPending = feeSummaries.sumOf { it.pendingForMonth }
+    val totalPending = feeSummaries.sumOf { it.totalCumulativeDue }
 
     val unpaidSummaries = remember(feeSummaries) {
         feeSummaries.filter { !it.isPaidInFull }
@@ -295,7 +296,7 @@ fun FeesScreen(viewModel: CoachingViewModel) {
                                     selectedMonth = selectedMonth,
                                     onPayNow = {
                                         preselectedStudentForPayment = summary.student
-                                        preselectedAmountForPayment = summary.pendingForMonth
+                                        preselectedAmountForPayment = summary.totalCumulativeDue
                                         showAddPaymentDialog = true
                                     },
                                     onViewSlip = if (summary.totalPaidForMonth > 0) {
@@ -591,15 +592,19 @@ fun StudentFeeCard(
                     Text("$currency ${String.format(Locale.US, "%,.0f", summary.totalPaidForMonth)}", fontWeight = FontWeight.SemiBold, color = PresentGreen)
                 }
                 Column {
-                    Text("Pending Due", style = MaterialTheme.typography.labelSmall, color = AbsentRed)
-                    Text("$currency ${String.format(Locale.US, "%,.0f", summary.pendingForMonth)}", fontWeight = FontWeight.Bold, color = AbsentRed)
+                    Text("Total Due / कुल बकाया", style = MaterialTheme.typography.labelSmall, color = AbsentRed)
+                    Text("$currency ${String.format(Locale.US, "%,.0f", summary.totalCumulativeDue)}", fontWeight = FontWeight.Bold, color = AbsentRed)
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (!isPaid && student.mobileNumber.isNotBlank()) {
                         IconButton(
                             onClick = {
-                                val message = "नमस्ते! छात्र ${student.name} की माह $selectedMonth की कोचिंग फीस बकाया है। कुल बकाया राशि: $currency ${String.format(Locale.US, "%,.0f", summary.pendingForMonth)}। कृपया जल्द भुगतान कराने का कष्ट करें। धन्यवाद।"
+                                val message = if (summary.previousMonthsDue > 0.0) {
+                                    "नमस्ते! छात्र ${student.name} की कुल कोचिंग फीस बकाया है। कुल बकाया राशि (पिछले महीनों सहित): $currency ${String.format(Locale.US, "%,.0f", summary.totalCumulativeDue)} (जिसमें पिछले ${summary.backMonthsCount} माह का बकाया $currency ${String.format(Locale.US, "%,.0f", summary.previousMonthsDue)} और इस माह का $currency ${String.format(Locale.US, "%,.0f", summary.pendingForMonth)} शामिल है)। कृपया जल्द भुगतान कराने का कष्ट करें। धन्यवाद।"
+                                } else {
+                                    "नमस्ते! छात्र ${student.name} की माह $selectedMonth की कोचिंग फीस बकाया है। कुल बकाया राशि: $currency ${String.format(Locale.US, "%,.0f", summary.totalCumulativeDue)}। कृपया जल्द भुगतान कराने का कष्ट करें। धन्यवाद।"
+                                }
                                 val uri = Uri.parse("https://api.whatsapp.com/send?phone=${student.mobileNumber}&text=${Uri.encode(message)}")
                                 val intent = Intent(Intent.ACTION_VIEW, uri)
                                 try {
@@ -673,6 +678,24 @@ fun StudentFeeCard(
                             )
                         }
                     }
+                }
+            }
+
+            if (summary.previousMonthsDue > 0.0) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xFFFEF2F2),
+                    border = BorderStroke(1.dp, Color(0xFFFECACA)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "⚠️ पिछले ${summary.backMonthsCount} माह का बकाया: $currency ${String.format(Locale.US, "%,.0f", summary.previousMonthsDue)} + इस माह: $currency ${String.format(Locale.US, "%,.0f", summary.pendingForMonth)} (कुल बकाया: $currency ${String.format(Locale.US, "%,.0f", summary.totalCumulativeDue)})",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AbsentRed,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
                 }
             }
         }

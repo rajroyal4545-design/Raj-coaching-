@@ -160,6 +160,14 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
             initialValue = emptyList()
         )
 
+    // All attendance records across all dates
+    val allAttendanceRecords: StateFlow<List<AttendanceRecord>> = repository.allAttendance
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     // Dashboard metrics
     val dashboardMetrics = combine(
         allStudents,
@@ -419,6 +427,17 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
 
     fun logoutCloud() {
         cloudSyncManager.logout()
+    }
+
+    fun resetCloudPassword(email: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val result = cloudSyncManager.sendPasswordResetEmail(email)
+            result.onSuccess { msg ->
+                onResult(true, msg)
+            }.onFailure { err ->
+                onResult(false, err.message ?: "Failed to send reset email")
+            }
+        }
     }
 
     fun uploadToCloud(onResult: (Boolean, String) -> Unit) {

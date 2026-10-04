@@ -18,6 +18,7 @@ class CoachingRepository(private val database: AppDatabase) {
     val coachingProfile: Flow<CoachingProfile?> = profileDao.getProfile()
     val allStudents: Flow<List<Student>> = studentDao.getAllStudents()
     val allPayments: Flow<List<FeePayment>> = feePaymentDao.getAllPayments()
+    val allAttendance: Flow<List<AttendanceRecord>> = attendanceDao.getAllAttendance()
 
     fun getAttendanceForDate(date: String): Flow<List<AttendanceRecord>> {
         return attendanceDao.getAttendanceForDate(date)

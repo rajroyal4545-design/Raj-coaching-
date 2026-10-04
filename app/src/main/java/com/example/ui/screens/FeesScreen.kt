@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -65,12 +67,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.FeePayment
 import com.example.data.model.Student
 import com.example.data.util.DateUtils
 import com.example.ui.components.AvatarInitials
 import com.example.ui.components.ConfirmDeleteDialog
 import com.example.ui.components.EmptyStateView
+import com.example.ui.components.PaymentSlipDialog
 import com.example.ui.components.SimpleDatePickerDialog
 import com.example.ui.components.SimpleMonthPickerDialog
 import com.example.ui.theme.AbsentRed
@@ -99,6 +103,13 @@ fun FeesScreen(viewModel: CoachingViewModel) {
     var showMonthPicker by remember { mutableStateOf(false) }
     var preselectedStudentForPayment by remember { mutableStateOf<Student?>(null) }
     var preselectedAmountForPayment by remember { mutableStateOf<Double?>(null) }
+
+    data class SlipViewData(
+        val student: Student,
+        val payment: FeePayment,
+        val totalPaidForMonth: Double
+    )
+    var activeSlipData by remember { mutableStateOf<SlipViewData?>(null) }
 
     val totalCollected = feeSummaries.sumOf { it.totalPaidForMonth }
     val totalPending = feeSummaries.sumOf { it.pendingForMonth }
@@ -269,6 +280,15 @@ fun FeesScreen(viewModel: CoachingViewModel) {
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(unpaidSummaries, key = { it.student.id }) { summary ->
+                                val studentPayments = allPayments.filter { it.studentId == summary.student.id && it.forMonthYear == selectedMonth }
+                                val lastPayment = studentPayments.lastOrNull() ?: FeePayment(
+                                    studentId = summary.student.id,
+                                    amountPaid = summary.totalPaidForMonth,
+                                    paymentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
+                                    forMonthYear = selectedMonth,
+                                    paymentMode = "Cash"
+                                )
+
                                 StudentFeeCard(
                                     summary = summary,
                                     currency = currency,
@@ -277,7 +297,16 @@ fun FeesScreen(viewModel: CoachingViewModel) {
                                         preselectedStudentForPayment = summary.student
                                         preselectedAmountForPayment = summary.pendingForMonth
                                         showAddPaymentDialog = true
-                                    }
+                                    },
+                                    onViewSlip = if (summary.totalPaidForMonth > 0) {
+                                        {
+                                            activeSlipData = SlipViewData(
+                                                student = summary.student,
+                                                payment = lastPayment,
+                                                totalPaidForMonth = summary.totalPaidForMonth
+                                            )
+                                        }
+                                    } else null
                                 )
                             }
                             item { Spacer(modifier = Modifier.height(72.dp)) }
@@ -298,6 +327,15 @@ fun FeesScreen(viewModel: CoachingViewModel) {
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(paidSummaries, key = { it.student.id }) { summary ->
+                                val studentPayments = allPayments.filter { it.studentId == summary.student.id && it.forMonthYear == selectedMonth }
+                                val lastPayment = studentPayments.lastOrNull() ?: FeePayment(
+                                    studentId = summary.student.id,
+                                    amountPaid = summary.totalPaidForMonth,
+                                    paymentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
+                                    forMonthYear = selectedMonth,
+                                    paymentMode = "Cash"
+                                )
+
                                 StudentFeeCard(
                                     summary = summary,
                                     currency = currency,
@@ -306,6 +344,13 @@ fun FeesScreen(viewModel: CoachingViewModel) {
                                         preselectedStudentForPayment = summary.student
                                         preselectedAmountForPayment = null
                                         showAddPaymentDialog = true
+                                    },
+                                    onViewSlip = {
+                                        activeSlipData = SlipViewData(
+                                            student = summary.student,
+                                            payment = lastPayment,
+                                            totalPaidForMonth = summary.totalPaidForMonth
+                                        )
                                     }
                                 )
                             }
@@ -332,6 +377,21 @@ fun FeesScreen(viewModel: CoachingViewModel) {
                                     payment = payment,
                                     studentName = student?.name ?: "Student #${payment.studentId}",
                                     currency = currency,
+                                    onViewSlip = {
+                                        val targetStudent = student ?: Student(
+                                            id = payment.studentId,
+                                            name = "Student #${payment.studentId}",
+                                            monthlyFee = payment.amountPaid
+                                        )
+                                        val cumulativePaid = allPayments
+                                            .filter { it.studentId == payment.studentId && it.forMonthYear == payment.forMonthYear }
+                                            .sumOf { it.amountPaid }
+                                        activeSlipData = SlipViewData(
+                                            student = targetStudent,
+                                            payment = payment,
+                                            totalPaidForMonth = cumulativePaid
+                                        )
+                                    },
                                     onEdit = { paymentToEdit = payment },
                                     onDelete = { paymentToDelete = payment }
                                 )
@@ -381,6 +441,19 @@ fun FeesScreen(viewModel: CoachingViewModel) {
                 showAddPaymentDialog = false
                 preselectedStudentForPayment = null
                 preselectedAmountForPayment = null
+
+                // Immediately offer to preview & download the fee slip
+                val student = allStudents.find { it.id == payment.studentId }
+                if (student != null) {
+                    val cumulative = allPayments
+                        .filter { it.studentId == payment.studentId && it.forMonthYear == payment.forMonthYear }
+                        .sumOf { it.amountPaid } + payment.amountPaid
+                    activeSlipData = SlipViewData(
+                        student = student,
+                        payment = payment,
+                        totalPaidForMonth = cumulative
+                    )
+                }
             }
         )
     }
@@ -421,6 +494,17 @@ fun FeesScreen(viewModel: CoachingViewModel) {
             onDismiss = { showMonthPicker = false }
         )
     }
+
+    // Payment Slip Preview & Download Dialog
+    activeSlipData?.let { data ->
+        PaymentSlipDialog(
+            profile = profile,
+            student = data.student,
+            payment = data.payment,
+            totalPaidForMonth = data.totalPaidForMonth,
+            onDismiss = { activeSlipData = null }
+        )
+    }
 }
 
 @Composable
@@ -428,7 +512,8 @@ fun StudentFeeCard(
     summary: StudentFeeSummary,
     currency: String,
     selectedMonth: String,
-    onPayNow: () -> Unit
+    onPayNow: () -> Unit,
+    onViewSlip: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val student = summary.student
@@ -538,6 +623,20 @@ fun StudentFeeCard(
                         }
                     }
 
+                    if (onViewSlip != null) {
+                        IconButton(
+                            onClick = onViewSlip,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Receipt,
+                                contentDescription = "View / Download Slip",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
                     if (!isPaid) {
                         Button(
                             onClick = onPayNow,
@@ -585,6 +684,7 @@ fun PaymentHistoryRow(
     payment: FeePayment,
     studentName: String,
     currency: String,
+    onViewSlip: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -621,6 +721,13 @@ fun PaymentHistoryRow(
             }
 
             Row {
+                IconButton(onClick = onViewSlip) {
+                    Icon(
+                        imageVector = Icons.Default.Receipt,
+                        contentDescription = "View Fee Slip",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
                 IconButton(onClick = onEdit) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit Payment", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -668,13 +775,17 @@ fun FeePaymentFormDialog(
 
     val paymentModes = listOf("Cash", "UPI", "Online", "Cheque")
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.94f)
                 .padding(vertical = 16.dp)
+                .imePadding()
         ) {
             Column(
                 modifier = Modifier

@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -472,19 +474,52 @@ fun AttendanceStudentRow(
     onMarkLeave: () -> Unit
 ) {
     val isClosed = status == "CLOSED"
+    val isDark = isSystemInDarkTheme()
+
+    val cardBg = if (isDark) {
+        when (status) {
+            "PRESENT" -> Color(0xFF142E20)
+            "ABSENT" -> Color(0xFF331518)
+            "LEAVE" -> Color(0xFF14203A)
+            "CLOSED" -> Color(0xFF1E293B).copy(alpha = 0.7f)
+            else -> MaterialTheme.colorScheme.surface
+        }
+    } else {
+        when (status) {
+            "PRESENT" -> Color(0xFFF0FDF4)
+            "ABSENT" -> Color(0xFFFEF2F2)
+            "LEAVE" -> Color(0xFFEFF6FF)
+            "CLOSED" -> Color(0xFFF8FAFC)
+            else -> MaterialTheme.colorScheme.surface
+        }
+    }
+
+    val cardBorder = if (isDark) {
+        when (status) {
+            "PRESENT" -> BorderStroke(1.5.dp, PresentGreen.copy(alpha = 0.8f))
+            "ABSENT" -> BorderStroke(1.5.dp, AbsentRed.copy(alpha = 0.8f))
+            "LEAVE" -> BorderStroke(1.5.dp, LeaveBlue.copy(alpha = 0.8f))
+            "CLOSED" -> BorderStroke(1.dp, ClosedGray.copy(alpha = 0.5f))
+            else -> BorderStroke(1.dp, Color(0xFF334155).copy(alpha = 0.5f))
+        }
+    } else {
+        when (status) {
+            "PRESENT" -> BorderStroke(1.dp, PresentGreen.copy(alpha = 0.4f))
+            "ABSENT" -> BorderStroke(1.dp, AbsentRed.copy(alpha = 0.4f))
+            "LEAVE" -> BorderStroke(1.dp, LeaveBlue.copy(alpha = 0.4f))
+            "CLOSED" -> BorderStroke(1.dp, ClosedGray.copy(alpha = 0.3f))
+            else -> BorderStroke(1.dp, Color(0xFFE2E8F0))
+        }
+    }
+
+    val studentNameColor = if (isDark) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+    val rollColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = when (status) {
-                "PRESENT" -> Color(0xFFF0FDF4)
-                "ABSENT" -> Color(0xFFFEF2F2)
-                "LEAVE" -> Color(0xFFEFF6FF)
-                "CLOSED" -> Color(0xFFF8FAFC)
-                else -> MaterialTheme.colorScheme.surface
-            }
-        ),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = cardBorder,
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
@@ -502,12 +537,12 @@ fun AttendanceStudentRow(
                     text = student.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = studentNameColor
                 )
                 Text(
                     text = "Roll: #${student.rollNumber} • ${student.batch}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = rollColor
                 )
                 if (isClosed) {
                     Text(
@@ -521,13 +556,16 @@ fun AttendanceStudentRow(
 
             // Quick Toggle Buttons with large touch targets: Present (P), Absent (A), Leave (L)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                val unselectedBtnBg = if (isDark) Color(0xFF273549) else Color(0xFFE2E8F0)
+                val unselectedBtnContent = if (isDark) Color(0xFFCBD5E1) else Color(0xFF475569)
+
                 // Present Button (P)
                 Button(
                     onClick = onMarkPresent,
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (status == "PRESENT") PresentGreen else Color(0xFFE2E8F0),
-                        contentColor = if (status == "PRESENT") Color.White else Color(0xFF475569)
+                        containerColor = if (status == "PRESENT") PresentGreen else unselectedBtnBg,
+                        contentColor = if (status == "PRESENT") Color.White else unselectedBtnContent
                     ),
                     modifier = Modifier
                         .height(38.dp)
@@ -542,8 +580,8 @@ fun AttendanceStudentRow(
                     onClick = onMarkAbsent,
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (status == "ABSENT") AbsentRed else Color(0xFFE2E8F0),
-                        contentColor = if (status == "ABSENT") Color.White else Color(0xFF475569)
+                        containerColor = if (status == "ABSENT") AbsentRed else unselectedBtnBg,
+                        contentColor = if (status == "ABSENT") Color.White else unselectedBtnContent
                     ),
                     modifier = Modifier
                         .height(38.dp)
@@ -558,8 +596,8 @@ fun AttendanceStudentRow(
                     onClick = onMarkLeave,
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (status == "LEAVE") LeaveBlue else Color(0xFFE2E8F0),
-                        contentColor = if (status == "LEAVE") Color.White else Color(0xFF475569)
+                        containerColor = if (status == "LEAVE") LeaveBlue else unselectedBtnBg,
+                        contentColor = if (status == "LEAVE") Color.White else unselectedBtnContent
                     ),
                     modifier = Modifier
                         .height(38.dp)

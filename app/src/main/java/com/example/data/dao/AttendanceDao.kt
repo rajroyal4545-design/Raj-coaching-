@@ -20,6 +20,9 @@ interface AttendanceDao {
     fun getAttendanceForMonth(monthPrefix: String): Flow<List<AttendanceRecord>>
 
     @Query("SELECT * FROM attendance_records")
+    fun getAllAttendance(): Flow<List<AttendanceRecord>>
+
+    @Query("SELECT * FROM attendance_records")
     suspend fun getAllAttendanceSync(): List<AttendanceRecord>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

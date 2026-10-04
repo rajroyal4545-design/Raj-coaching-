@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -87,6 +89,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.ui.theme.AbsentRed
 import com.example.ui.theme.IndigoLight
 import com.example.ui.theme.PresentGreen
@@ -577,6 +580,31 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
                     )
                 }
 
+                // Official Contact Email Button
+                OutlinedButton(
+                    onClick = {
+                        openEmailClient(context, "royalraj8338@gmail.com", "Coaching Attendance Manager Inquiry / Support")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1E88E5).copy(alpha = 0.5f))
+                ) {
+                    Text(text = "✉️", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Email: royalraj8338@gmail.com",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Email,
+                        contentDescription = "Send Email",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
                 // Legal Buttons: Privacy Policy & Terms and Conditions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -684,18 +712,25 @@ fun CloudAuthDialog(
     onDismiss: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Login, 1: Register
+    var isForgotPasswordMode by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
     val authState by viewModel.cloudAuthState.collectAsState()
     val context = LocalContext.current
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .imePadding()
         ) {
             Column(
                 modifier = Modifier
@@ -703,107 +738,368 @@ fun CloudAuthDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = if (selectedTab == 0) "Login to Coaching Account" else "Create Coaching Account",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0; errorMessage = null },
-                        text = { Text("Sign In / लॉग इन") }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1; errorMessage = null },
-                        text = { Text("Register / खाता बनाएँ") }
-                    )
-                }
-
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Email Address / ईमेल") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Password / पासवर्ड") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                if (errorMessage != null) {
-                    Surface(
-                        color = Color(0xFFFEE2E2),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                if (isForgotPasswordMode) {
+                    // ================= FORGOT PASSWORD MODE =================
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = errorMessage ?: "",
-                            color = AbsentRed,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(10.dp)
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Key,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Forgot Password? / पासवर्ड भूल गए?",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Reset Coaching Account Password",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss, enabled = !isLoading) {
-                        Text("Cancel / रद्द करें")
+                    Text(
+                        text = "अपना पंजीकृत ईमेल पता दर्ज करें। आपके ईमेल पर पासवर्ड रीसेट करने का सीधा लिंक भेजा जाएगा।\n(Enter your registered email address. A password reset link will be sent to your email.)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it; errorMessage = null; resetSuccessMessage = null },
+                        label = { Text("Registered Email / पंजीकृत ईमेल") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (resetSuccessMessage != null) {
+                        Surface(
+                            color = Color(0xFFE8F5E9),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(1.dp, Color(0xFF81C784))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color(0xFF2E7D32),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = resetSuccessMessage ?: "",
+                                    color = Color(0xFF1B5E20),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    if (errorMessage != null) {
+                        Surface(
+                            color = Color(0xFFFEE2E2),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(1.dp, Color(0xFFEF9A9A))
+                        ) {
+                            Text(
+                                text = errorMessage ?: "",
+                                color = AbsentRed,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+
                     Button(
                         onClick = {
-                            if (email.isBlank() || password.isBlank()) {
-                                errorMessage = "Please enter both email and password."
+                            if (email.isBlank()) {
+                                errorMessage = "कृपया अपना ईमेल पता दर्ज करें। (Please enter your email.)"
                                 return@Button
                             }
                             isLoading = true
                             errorMessage = null
-                            if (selectedTab == 0) {
-                                viewModel.loginCloud(email.trim(), password.trim()) { success, msg ->
-                                    isLoading = false
-                                    if (success) {
-                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                                        onDismiss()
-                                    } else {
-                                        errorMessage = msg
-                                    }
-                                }
-                            } else {
-                                viewModel.registerCloud(email.trim(), password.trim()) { success, msg ->
-                                    isLoading = false
-                                    if (success) {
-                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                                        onDismiss()
-                                    } else {
-                                        errorMessage = msg
-                                    }
+                            resetSuccessMessage = null
+                            viewModel.resetCloudPassword(email.trim()) { success, msg ->
+                                isLoading = false
+                                if (success) {
+                                    resetSuccessMessage = msg
+                                } else {
+                                    errorMessage = msg
                                 }
                             }
                         },
                         enabled = !isLoading,
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         if (isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
                         }
-                        Text(if (selectedTab == 0) "Sign In" else "Create Account", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Send Reset Link / रीसेट लिंक भेजें",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Contact Developer Support Box
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "🆘 Need Direct Help? / सीधे सहायता संपर्क",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "यदि ईमेल नहीं मिल रहा है या पासवर्ड में कोई समस्या आ रही है, तो ऐप ओनर से सीधे संपर्क करें:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    openEmailClient(
+                                        context = context,
+                                        email = "royalraj8338@gmail.com",
+                                        subject = "Forgot Password Help - Coaching Manager (${email.ifBlank { "User" }})"
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "royalraj8338@gmail.com पर ईमेल करें",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                isForgotPasswordMode = false
+                                errorMessage = null
+                                resetSuccessMessage = null
+                            }
+                        ) {
+                            Text("← Back to Sign In / वापस")
+                        }
+
+                        TextButton(onClick = onDismiss) {
+                            Text("Close / बंद करें")
+                        }
+                    }
+                } else {
+                    // ================= NORMAL SIGN IN / REGISTER MODE =================
+                    Text(
+                        text = if (selectedTab == 0) "Login to Coaching Account" else "Create Coaching Account",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    TabRow(selectedTabIndex = selectedTab) {
+                        Tab(
+                            selected = selectedTab == 0,
+                            onClick = { selectedTab = 0; errorMessage = null; resetSuccessMessage = null },
+                            text = { Text("Sign In / लॉग इन") }
+                        )
+                        Tab(
+                            selected = selectedTab == 1,
+                            onClick = { selectedTab = 1; errorMessage = null; resetSuccessMessage = null },
+                            text = { Text("Register / खाता बनाएँ") }
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it; errorMessage = null },
+                        label = { Text("Email Address / ईमेल") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it; errorMessage = null },
+                        label = { Text("Password / पासवर्ड") },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (selectedTab == 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    isForgotPasswordMode = true
+                                    errorMessage = null
+                                    resetSuccessMessage = null
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Key,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Forgot Password? / पासवर्ड भूल गए?",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    if (errorMessage != null) {
+                        Surface(
+                            color = Color(0xFFFEE2E2),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = errorMessage ?: "",
+                                color = AbsentRed,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = onDismiss, enabled = !isLoading) {
+                            Text("Cancel / रद्द करें")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (email.isBlank() || password.isBlank()) {
+                                    errorMessage = "Please enter both email and password."
+                                    return@Button
+                                }
+                                isLoading = true
+                                errorMessage = null
+                                if (selectedTab == 0) {
+                                    viewModel.loginCloud(email.trim(), password.trim()) { success, msg ->
+                                        isLoading = false
+                                        if (success) {
+                                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                            onDismiss()
+                                        } else {
+                                            errorMessage = msg
+                                        }
+                                    }
+                                } else {
+                                    viewModel.registerCloud(email.trim(), password.trim()) { success, msg ->
+                                        isLoading = false
+                                        if (success) {
+                                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                            onDismiss()
+                                        } else {
+                                            errorMessage = msg
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !isLoading,
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(if (selectedTab == 0) "Sign In" else "Create Account", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Bottom Support Bar with Contact Email
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                openEmailClient(context, "royalraj8338@gmail.com", "Coaching Manager Login Assistance")
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Support Email: royalraj8338@gmail.com",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
@@ -821,11 +1117,16 @@ fun ImportBackupDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .imePadding()
         ) {
             Column(
                 modifier = Modifier
@@ -919,6 +1220,20 @@ private fun openWebLink(context: Context, url: String) {
         context.startActivity(intent)
     } catch (e: Exception) {
         Toast.makeText(context, "Link cannot be opened: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun openEmailClient(context: Context, email: String, subject: String = "Coaching Attendance Manager Inquiry") {
+    try {
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = Uri.parse("mailto:$email?subject=${Uri.encode(subject)}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        clipboard?.setPrimaryClip(ClipData.newPlainText("Contact Email", email))
+        Toast.makeText(context, "Email copied to clipboard: $email", Toast.LENGTH_LONG).show()
     }
 }
 
@@ -1028,7 +1343,7 @@ fun PrivacyPolicyDialog(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Published by 👑 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔. For questions, suggestions, or privacy requests, visit our official blog or Instagram page.",
+                    text = "Published by 👑 𝐑𝐨𝐲𝐚𝐥 𝐀𝐈 𝐇𝐮𝐛𝟒𝐔. For questions, suggestions, or privacy requests, email us at royalraj8338@gmail.com or visit our official blog / Instagram page.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1040,10 +1355,12 @@ fun PrivacyPolicyDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onOpenWebPolicy) {
-                        Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Visit Website", fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(onClick = onOpenWebPolicy) {
+                            Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Website", fontSize = 12.sp)
+                        }
                     }
                     Button(onClick = onDismiss, shape = RoundedCornerShape(10.dp)) {
                         Text("Close / बंद करें", fontWeight = FontWeight.Bold)
@@ -1118,6 +1435,10 @@ fun TermsConditionsDialog(
                             text = "📸 Instagram: @royal_ai_hub4u",
                             style = MaterialTheme.typography.bodySmall
                         )
+                        Text(
+                            text = "📧 Email: royalraj8338@gmail.com",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
 
@@ -1160,7 +1481,7 @@ fun TermsConditionsDialog(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "For inquiries, technical queries, or feedback, you can connect with us directly via our official Instagram handle or Blogger website.",
+                    text = "For inquiries, technical queries, or feedback, connect with us directly via royalraj8338@gmail.com, our official Instagram handle, or Blogger website.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1192,6 +1513,7 @@ fun AboutAppDialog(
     onOpenInstagram: () -> Unit,
     onOpenBlog: () -> Unit
 ) {
+    val context = LocalContext.current
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
@@ -1273,6 +1595,24 @@ fun AboutAppDialog(
                     ) {
                         Text("🌐 Website", fontSize = 12.sp)
                     }
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        openEmailClient(context, "royalraj8338@gmail.com", "Coaching Attendance Manager Inquiry / Help")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1E88E5).copy(alpha = 0.5f))
+                ) {
+                    Text(text = "✉️", fontSize = 14.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Email: royalraj8338@gmail.com",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
 
                 Button(

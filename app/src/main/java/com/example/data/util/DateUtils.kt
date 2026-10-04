@@ -58,4 +58,19 @@ object DateUtils {
         val admissionMonth = extractMonthYear(joiningDate) ?: return true
         return admissionMonth <= targetMonth
     }
+
+    /**
+     * Shifts a YYYY-MM string by offsetMonths (e.g. -1 for previous month, +1 for next month)
+     */
+    fun getAdjacentMonth(monthYear: String, offsetMonths: Int): String {
+        return try {
+            val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+            val cal = java.util.Calendar.getInstance()
+            cal.time = sdf.parse(monthYear) ?: java.util.Date()
+            cal.add(java.util.Calendar.MONTH, offsetMonths)
+            sdf.format(cal.time)
+        } catch (_: Exception) {
+            monthYear
+        }
+    }
 }

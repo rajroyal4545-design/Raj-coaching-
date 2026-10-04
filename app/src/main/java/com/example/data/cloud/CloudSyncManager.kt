@@ -193,6 +193,49 @@ class CloudSyncManager(private val context: Context) {
     }
 
     /**
+     * Sends a password reset email via Firebase Auth REST API (sendOobCode).
+     */
+    suspend fun sendPasswordResetEmail(email: String): Result<String> = withContext(Dispatchers.IO) {
+        val apiKey = _authState.value.firebaseApiKey
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(
+                Exception("Firebase API Key is missing. Please check your configuration.")
+            )
+        }
+        try {
+            val url = URL("https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=$apiKey")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json")
+                doOutput = true
+                connectTimeout = 15000
+                readTimeout = 15000
+            }
+
+            val body = JSONObject().apply {
+                put("requestType", "PASSWORD_RESET")
+                put("email", email.trim())
+            }
+
+            OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+
+            val responseCode = conn.responseCode
+            val stream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
+            val response = BufferedReader(InputStreamReader(stream)).readText()
+
+            val json = JSONObject(response)
+            if (responseCode in 200..299) {
+                Result.success("Password reset email sent successfully! Please check your inbox or spam folder.")
+            } else {
+                val errorMsg = json.optJSONObject("error")?.optString("message") ?: "Password reset request failed ($responseCode)"
+                Result.failure(Exception(formatFirebaseError(errorMsg)))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(e.message ?: "Network error during password reset"))
+        }
+    }
+
+    /**
      * Uploads the entire local coaching database to Firebase Realtime Database
      */
     suspend fun uploadToCloud(payload: CloudBackupPayload): Result<String> = withContext(Dispatchers.IO) {
@@ -474,11 +517,12 @@ class CloudSyncManager(private val context: Context) {
 
     private fun formatFirebaseError(err: String): String {
         return when {
-            err.contains("EMAIL_EXISTS") -> "This email is already registered. Please sign in instead."
-            err.contains("EMAIL_NOT_FOUND") -> "No account found with this email. Please register first."
-            err.contains("INVALID_PASSWORD") || err.contains("INVALID_LOGIN_CREDENTIALS") -> "Invalid email or password."
-            err.contains("WEAK_PASSWORD") -> "Password should be at least 6 characters long."
-            err.contains("INVALID_EMAIL") -> "Please enter a valid email address."
+            err.contains("EMAIL_EXISTS") -> "यह ईमेल पहले से पंजीकृत है। कृपया लॉग इन करें। (This email is already registered. Please sign in instead.)"
+            err.contains("EMAIL_NOT_FOUND") -> "इस ईमेल से कोई खाता नहीं मिला। कृपया सही ईमेल दर्ज करें या खाता बनाएँ। (No account found with this email.)"
+            err.contains("INVALID_PASSWORD") || err.contains("INVALID_LOGIN_CREDENTIALS") -> "गलत ईमेल या पासवर्ड। (Invalid email or password.)"
+            err.contains("WEAK_PASSWORD") -> "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए। (Password should be at least 6 characters long.)"
+            err.contains("INVALID_EMAIL") -> "कृपया एक मान्य ईमेल पता दर्ज करें। (Please enter a valid email address.)"
+            err.contains("TOO_MANY_ATTEMPTS_TRY_LATER") -> "बहुत अधिक प्रयास। कृपया कुछ समय बाद पुनः प्रयास करें। (Too many attempts. Please try again later.)"
             else -> err
         }
     }

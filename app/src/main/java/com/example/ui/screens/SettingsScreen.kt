@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,11 +22,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.Brightness7
+import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Palette
+import com.example.ui.theme.AppThemeMode
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
@@ -117,6 +127,9 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
     var showAboutDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    val currentThemeMode by viewModel.themeMode.collectAsState()
+    val currentThemePalette by viewModel.themePalette.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -125,6 +138,235 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Spacer(modifier = Modifier.height(4.dp))
+
+        // Appearance / Theme Card (Color Palettes & Light/Dark Mode)
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Palette,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Theme & Appearance / नया थीम और रंग",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "पसंदीदा रंग पैलेट और लाइट/डार्क मोड चुनें",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // 1. Color Palettes Selection Header
+                Text(
+                    text = "1. Color Palette / थीम रंग शैली",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.example.ui.theme.AppThemePalette.values().forEach { palette ->
+                        val isSelected = currentThemePalette == palette
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setThemePalette(palette) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Two-tone palette preview dots
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clip(CircleShape)
+                                            .background(palette.primaryColor)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(palette.secondaryColor)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "${palette.iconEmoji} ${palette.titleEn}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = palette.titleHi,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                if (isSelected) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Active",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // 2. Theme Mode Selection Header
+                Text(
+                    text = "2. Display Mode / डिस्प्ले मोड",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Light Mode Button
+                    val isLightSelected = currentThemeMode == AppThemeMode.LIGHT
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.setThemeMode(AppThemeMode.LIGHT) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isLightSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = if (isLightSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LightMode,
+                                contentDescription = "Light Mode",
+                                tint = if (isLightSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Light\nलाइट ☀️",
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isLightSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isLightSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 13.sp
+                            )
+                        }
+                    }
+
+                    // Dark Mode Button
+                    val isDarkSelected = currentThemeMode == AppThemeMode.DARK
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.setThemeMode(AppThemeMode.DARK) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isDarkSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = if (isDarkSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DarkMode,
+                                contentDescription = "Dark Mode",
+                                tint = if (isDarkSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Dark\nडार्क 🌙",
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isDarkSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isDarkSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 13.sp
+                            )
+                        }
+                    }
+
+                    // System Default Button
+                    val isSystemSelected = currentThemeMode == AppThemeMode.SYSTEM
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.setThemeMode(AppThemeMode.SYSTEM) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSystemSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = if (isSystemSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.BrightnessAuto,
+                                contentDescription = "System Default",
+                                tint = if (isSystemSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "System\nसिस्टम ⚙️",
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSystemSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSystemSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 13.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // Profile Form Card
         ElevatedCard(

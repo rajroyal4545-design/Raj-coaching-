@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.School
@@ -66,6 +69,7 @@ fun CoachingApp(viewModel: CoachingViewModel) {
     var currentTab by remember { mutableStateOf(AppTab.HOME) }
     var showSettings by remember { mutableStateOf(false) }
     val profile by viewModel.coachingProfile.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
 
     if (showSettings) {
         BackHandler { showSettings = false }
@@ -123,6 +127,17 @@ fun CoachingApp(viewModel: CoachingViewModel) {
                             )
                         },
                         actions = {
+                            IconButton(onClick = { viewModel.toggleThemeMode() }) {
+                                Icon(
+                                    imageVector = when (themeMode) {
+                                        com.example.ui.theme.AppThemeMode.DARK -> Icons.Default.LightMode
+                                        com.example.ui.theme.AppThemeMode.LIGHT -> Icons.Default.DarkMode
+                                        com.example.ui.theme.AppThemeMode.SYSTEM -> Icons.Default.Brightness4
+                                    },
+                                    contentDescription = "Toggle Theme Mode",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                             IconButton(onClick = { showSettings = true }) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
@@ -140,8 +155,9 @@ fun CoachingApp(viewModel: CoachingViewModel) {
             },
             bottomBar = {
                 NavigationBar(
-                    containerColor = Color(0xFF0F172A),
-                    tonalElevation = 8.dp
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    tonalElevation = 6.dp
                 ) {
                     AppTab.values().forEach { tab ->
                         val isSelected = currentTab == tab
@@ -162,11 +178,11 @@ fun CoachingApp(viewModel: CoachingViewModel) {
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                selectedTextColor = Color(0xFF38BDF8),
-                                indicatorColor = Color(0xFF1E293B),
-                                unselectedIconColor = Color(0xFF94A3B8),
-                                unselectedTextColor = Color(0xFF94A3B8)
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                     }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -20,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,14 +30,17 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +54,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -58,6 +65,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ui.theme.AppThemeMode
+import com.example.ui.theme.AppThemePalette
 import com.example.ui.viewmodel.CoachingViewModel
 import java.util.Locale
 
@@ -72,6 +81,8 @@ fun DashboardScreen(
 ) {
     val profile by viewModel.coachingProfile.collectAsState()
     val metrics by viewModel.dashboardMetrics.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
+    val themePalette by viewModel.themePalette.collectAsState()
     val currency = profile.currencySymbol.ifBlank { "₹" }
     val context = LocalContext.current
     var showAboutDialog by remember { mutableStateOf(false) }
@@ -79,29 +90,29 @@ fun DashboardScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0F1D))
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. Header with Greeting, 3D Book & Graduation Cap PNG illustration, and Settings Gear
+        // 1. Header with Greeting, Coaching Name, 3D Illustration & Quick Theme Switcher
         item {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Hello,",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF94A3B8),
+                        text = "Hello / नमस्ते,",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = "${profile.coachingName.ifBlank { "Apex Coaching Classes" }} 🌱",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -113,24 +124,41 @@ fun DashboardScreen(
                             "Keep learning, keep growing ☀️"
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFCBD5E1),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                // 3D Books + Mortarboard + Sprout Vector Illustration
+                // 3D Books + Sprout Vector Illustration
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(76.dp)
                         .padding(end = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_hero_books),
                         contentDescription = "Books and Graduation Cap",
-                        modifier = Modifier.size(76.dp)
+                        modifier = Modifier.size(72.dp)
+                    )
+                }
+
+                // Theme Mode (Light / Dark) Toggle Icon
+                IconButton(
+                    onClick = { viewModel.toggleThemeMode() },
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Icon(
+                        imageVector = when (themeMode) {
+                            AppThemeMode.DARK -> Icons.Default.LightMode
+                            AppThemeMode.LIGHT -> Icons.Default.DarkMode
+                            AppThemeMode.SYSTEM -> Icons.Default.DarkMode
+                        },
+                        contentDescription = "Toggle Theme (Light / Dark)",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
@@ -141,20 +169,129 @@ fun DashboardScreen(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
-                        tint = Color(0xFFE2E8F0),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
                 }
             }
         }
 
-        // 2. Today's Goal & Month Collection Card
+        // 2. Interactive Theme Palette Quick Switcher Strip
         item {
-            Card(
+            ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF131D35)),
-                border = BorderStroke(1.dp, Color(0xFF1E293B))
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "App Theme / नया थीम",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Active Theme badge
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                        ) {
+                            Text(
+                                text = "${themePalette.iconEmoji} ${themePalette.titleHi}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(AppThemePalette.values()) { palette ->
+                            val isSelected = themePalette == palette
+                            val animBorderColor by animateColorAsState(
+                                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                label = "borderAnim"
+                            )
+
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { viewModel.setThemePalette(palette) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                border = BorderStroke(
+                                    if (isSelected) 2.dp else 1.dp,
+                                    if (isSelected) animBorderColor else MaterialTheme.colorScheme.outlineVariant
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Palette primary color dot
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .clip(CircleShape)
+                                            .background(palette.primaryColor)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "${palette.iconEmoji} ${palette.titleEn}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (isSelected) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Today's Goal & Month Collection Card
+        item {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -169,25 +306,25 @@ fun DashboardScreen(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = Color(0xFF0284C7).copy(alpha = 0.25f),
-                            modifier = Modifier.size(38.dp)
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(42.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(text = "🎯", fontSize = 18.sp)
+                                Text(text = "🎯", fontSize = 20.sp)
                             }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Today's Goal",
+                                text = "Today's Goal / हाजिरी",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF94A3B8)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = "${metrics.todayPresent} / ${metrics.totalStudents} Present",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -197,7 +334,7 @@ fun DashboardScreen(
                         modifier = Modifier
                             .width(1.dp)
                             .height(38.dp)
-                            .background(Color(0xFF334155))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     )
 
                     Spacer(modifier = Modifier.width(14.dp))
@@ -205,22 +342,22 @@ fun DashboardScreen(
                     // Right Column: Month Collection
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Month Collection",
+                            text = "Month Collection / फीस",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "$currency ${String.format(Locale.US, "%,.0f", metrics.currentMonthCollection)}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
             }
         }
 
-        // 3. Two Large Action Pill Cards (Add Student & Today's Attendance)
+        // 4. Two Large Action Pill Cards (Add Student & Today's Attendance)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -230,7 +367,7 @@ fun DashboardScreen(
                 Card(
                     modifier = Modifier
                         .weight(1f)
-                        .height(60.dp)
+                        .height(64.dp)
                         .clickable(onClick = onNavigateToStudents),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.Transparent)
@@ -240,7 +377,10 @@ fun DashboardScreen(
                             .fillMaxSize()
                             .background(
                                 Brush.horizontalGradient(
-                                    listOf(Color(0xFF3B82F6), Color(0xFF6366F1))
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.secondary
+                                    )
                                 )
                             )
                             .padding(horizontal = 14.dp),
@@ -279,7 +419,7 @@ fun DashboardScreen(
                 Card(
                     modifier = Modifier
                         .weight(1f)
-                        .height(60.dp)
+                        .height(64.dp)
                         .clickable(onClick = onNavigateToAttendance),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.Transparent)
@@ -289,7 +429,10 @@ fun DashboardScreen(
                             .fillMaxSize()
                             .background(
                                 Brush.horizontalGradient(
-                                    listOf(Color(0xFF22C55E), Color(0xFF16A34A))
+                                    listOf(
+                                        Color(0xFF059669),
+                                        Color(0xFF10B981)
+                                    )
                                 )
                             )
                             .padding(horizontal = 14.dp),
@@ -326,7 +469,7 @@ fun DashboardScreen(
             }
         }
 
-        // 4. 4x2 Colorful Stats & Navigation Grid (8 Vibrant Cards)
+        // 5. 4x2 Colorful Stats & Navigation Grid (8 Vibrant Cards)
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // Row 1: Total Students, Today's Absent, Today's Leave, Pending Fee
@@ -334,10 +477,12 @@ fun DashboardScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Card 1: Total Students (Blue with red badge dot)
+                    // Card 1: Total Students
                     DashboardGridCard(
                         modifier = Modifier.weight(1f),
-                        gradient = Brush.verticalGradient(listOf(Color(0xFF2563EB), Color(0xFF1D4ED8))),
+                        gradient = Brush.verticalGradient(
+                            listOf(Color(0xFF2563EB), Color(0xFF1D4ED8))
+                        ),
                         icon = {
                             Box {
                                 Icon(
@@ -346,7 +491,6 @@ fun DashboardScreen(
                                     tint = Color.White,
                                     modifier = Modifier.size(24.dp)
                                 )
-                                // Red indicator dot
                                 Box(
                                     modifier = Modifier
                                         .size(7.dp)
@@ -360,10 +504,12 @@ fun DashboardScreen(
                         onClick = onNavigateToStudents
                     )
 
-                    // Card 2: Today's Absent (Purple/Violet)
+                    // Card 2: Today's Absent
                     DashboardGridCard(
                         modifier = Modifier.weight(1f),
-                        gradient = Brush.verticalGradient(listOf(Color(0xFF8B5CF6), Color(0xFF6D28D9))),
+                        gradient = Brush.verticalGradient(
+                            listOf(Color(0xFF8B5CF6), Color(0xFF6D28D9))
+                        ),
                         icon = {
                             Icon(
                                 imageVector = Icons.Default.CalendarMonth,
@@ -377,10 +523,12 @@ fun DashboardScreen(
                         onClick = onNavigateToAttendance
                     )
 
-                    // Card 3: Today's Leave (Amber/Orange)
+                    // Card 3: Today's Leave
                     DashboardGridCard(
                         modifier = Modifier.weight(1f),
-                        gradient = Brush.verticalGradient(listOf(Color(0xFFF59E0B), Color(0xFFD97706))),
+                        gradient = Brush.verticalGradient(
+                            listOf(Color(0xFFF59E0B), Color(0xFFD97706))
+                        ),
                         icon = {
                             Icon(
                                 imageVector = Icons.Default.Description,
@@ -394,10 +542,12 @@ fun DashboardScreen(
                         onClick = onNavigateToAttendance
                     )
 
-                    // Card 4: Pending Fee (Emerald Green)
+                    // Card 4: Pending Fee
                     DashboardGridCard(
                         modifier = Modifier.weight(1f),
-                        gradient = Brush.verticalGradient(listOf(Color(0xFF10B981), Color(0xFF059669))),
+                        gradient = Brush.verticalGradient(
+                            listOf(Color(0xFF10B981), Color(0xFF059669))
+                        ),
                         icon = {
                             Surface(
                                 shape = CircleShape,
@@ -415,15 +565,17 @@ fun DashboardScreen(
                     )
                 }
 
-                // Row 2: New Collection, Monthly Collection, Settings, About
+                // Row 2: New Collection, Monthly Collection, Reports, Settings
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Card 5: New Collection (Coral Red)
+                    // Card 5: New Collection
                     DashboardGridCard(
                         modifier = Modifier.weight(1f),
-                        gradient = Brush.verticalGradient(listOf(Color(0xFFEF4444), Color(0xFFDC2626))),
+                        gradient = Brush.verticalGradient(
+                            listOf(Color(0xFFEF4444), Color(0xFFDC2626))
+                        ),
                         icon = {
                             Box {
                                 Icon(
@@ -446,10 +598,12 @@ fun DashboardScreen(
                         onClick = onNavigateToFees
                     )
 
-                    // Card 6: Monthly Collection (Vibrant Blue/Cyan)
+                    // Card 6: Monthly Collection
                     DashboardGridCard(
                         modifier = Modifier.weight(1f),
-                        gradient = Brush.verticalGradient(listOf(Color(0xFF0284C7), Color(0xFF0369A1))),
+                        gradient = Brush.verticalGradient(
+                            listOf(Color(0xFF0284C7), Color(0xFF0369A1))
+                        ),
                         icon = {
                             Icon(
                                 imageVector = Icons.Default.BarChart,
@@ -463,10 +617,12 @@ fun DashboardScreen(
                         onClick = onNavigateToFees
                     )
 
-                    // Card 7: Student Reports (Cyan/Teal)
+                    // Card 7: Student Reports
                     DashboardGridCard(
                         modifier = Modifier.weight(1f),
-                        gradient = Brush.verticalGradient(listOf(Color(0xFF06B6D4), Color(0xFF0891B2))),
+                        gradient = Brush.verticalGradient(
+                            listOf(Color(0xFF06B6D4), Color(0xFF0891B2))
+                        ),
                         icon = {
                             Icon(
                                 imageVector = Icons.Default.BarChart,
@@ -480,10 +636,15 @@ fun DashboardScreen(
                         onClick = onNavigateToReports
                     )
 
-                    // Card 8: Settings (Indigo/Slate)
+                    // Card 8: Settings
                     DashboardGridCard(
                         modifier = Modifier.weight(1f),
-                        gradient = Brush.verticalGradient(listOf(Color(0xFF475569), Color(0xFF1E293B))),
+                        gradient = Brush.verticalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.secondary
+                            )
+                        ),
                         icon = {
                             Icon(
                                 imageVector = Icons.Default.Settings,
@@ -492,7 +653,7 @@ fun DashboardScreen(
                                 modifier = Modifier.size(24.dp)
                             )
                         },
-                        value = "",
+                        value = "⚙️",
                         label = "Settings >",
                         onClick = onNavigateToSettings
                     )
@@ -500,18 +661,20 @@ fun DashboardScreen(
             }
         }
 
-        // 5. Inspirational Quote Banner with Glowing Seedling Sprout PNG illustration
+        // 6. Inspirational Quote Banner
         item {
-            Card(
+            ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF131D35)),
-                border = BorderStroke(1.dp, Color(0xFF1E293B))
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(text = "💡", fontSize = 22.sp)
@@ -522,15 +685,15 @@ fun DashboardScreen(
                         modifier = Modifier
                             .width(1.dp)
                             .height(32.dp)
-                            .background(Color(0xFF334155))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     )
 
                     Spacer(modifier = Modifier.width(10.dp))
 
                     Text(
-                        text = "\"Small steps every day\nlead to big results.\" 💛",
+                        text = "\"Small steps every day lead to big results.\" 💛\n\"हर दिन की मेहनत सफलता दिलाती है।\"",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFE2E8F0),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium,
                         lineHeight = 16.sp,
                         modifier = Modifier.weight(1f)
@@ -539,14 +702,14 @@ fun DashboardScreen(
                     Image(
                         painter = painterResource(id = R.drawable.ic_seedling_sprout),
                         contentDescription = "Sprout",
-                        modifier = Modifier.size(46.dp)
+                        modifier = Modifier.size(44.dp)
                     )
                 }
             }
         }
 
         item {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 
@@ -574,7 +737,7 @@ fun DashboardGridCard(
 ) {
     Card(
         modifier = modifier
-            .height(102.dp)
+            .height(104.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent)

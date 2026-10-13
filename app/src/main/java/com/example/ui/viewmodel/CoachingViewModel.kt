@@ -79,6 +79,48 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
     private val _selectedBatchFilter = MutableStateFlow("All")
     val selectedBatchFilter: StateFlow<String> = _selectedBatchFilter.asStateFlow()
 
+    // App Theme Mode (System / Light / Dark)
+    private val prefs = application.getSharedPreferences("coaching_app_prefs", android.content.Context.MODE_PRIVATE)
+    private val _themeMode = MutableStateFlow(
+        try {
+            val saved = prefs.getString("app_theme_mode", com.example.ui.theme.AppThemeMode.LIGHT.name)
+            if (saved != null) com.example.ui.theme.AppThemeMode.valueOf(saved) else com.example.ui.theme.AppThemeMode.LIGHT
+        } catch (_: Exception) {
+            com.example.ui.theme.AppThemeMode.LIGHT
+        }
+    )
+    val themeMode: StateFlow<com.example.ui.theme.AppThemeMode> = _themeMode.asStateFlow()
+
+    // App Theme Color Palette (Royal Violet, Emerald Mint, Ocean Sapphire, Sunset Amber, Midnight Neon)
+    private val _themePalette = MutableStateFlow(
+        try {
+            val savedPalette = prefs.getString("app_theme_palette", com.example.ui.theme.AppThemePalette.ROYAL_VIOLET.name)
+            if (savedPalette != null) com.example.ui.theme.AppThemePalette.valueOf(savedPalette) else com.example.ui.theme.AppThemePalette.ROYAL_VIOLET
+        } catch (_: Exception) {
+            com.example.ui.theme.AppThemePalette.ROYAL_VIOLET
+        }
+    )
+    val themePalette: StateFlow<com.example.ui.theme.AppThemePalette> = _themePalette.asStateFlow()
+
+    fun setThemeMode(mode: com.example.ui.theme.AppThemeMode) {
+        _themeMode.value = mode
+        prefs.edit().putString("app_theme_mode", mode.name).apply()
+    }
+
+    fun setThemePalette(palette: com.example.ui.theme.AppThemePalette) {
+        _themePalette.value = palette
+        prefs.edit().putString("app_theme_palette", palette.name).apply()
+    }
+
+    fun toggleThemeMode() {
+        val next = when (_themeMode.value) {
+            com.example.ui.theme.AppThemeMode.LIGHT -> com.example.ui.theme.AppThemeMode.DARK
+            com.example.ui.theme.AppThemeMode.DARK -> com.example.ui.theme.AppThemeMode.LIGHT
+            com.example.ui.theme.AppThemeMode.SYSTEM -> com.example.ui.theme.AppThemeMode.LIGHT
+        }
+        setThemeMode(next)
+    }
+
     // Active Profile
     val coachingProfile: StateFlow<CoachingProfile> = repository.coachingProfile
         .map { it ?: CoachingProfile() }

@@ -7,10 +7,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import com.example.ui.CoachingApp
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.CoachingViewModel
@@ -22,7 +21,9 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     setContent {
-      MyApplicationTheme {
+      val themeMode by viewModel.themeMode.collectAsState()
+      val themePalette by viewModel.themePalette.collectAsState()
+      MyApplicationTheme(themeMode = themeMode, themePalette = themePalette) {
         Surface(modifier = Modifier.fillMaxSize()) {
           CoachingApp(viewModel = viewModel)
         }
@@ -30,15 +31,3 @@ class MainActivity : ComponentActivity() {
     }
   }
 }
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-  Text(text = "Hello $name!", modifier = modifier)
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-  MyApplicationTheme { Greeting("Android") }
-}
-

@@ -105,7 +105,13 @@ fun AttendanceScreen(viewModel: CoachingViewModel) {
         (attendanceMap.isNotEmpty() && attendanceMap.values.all { it.status == "CLOSED" })
 
     val unmarkedCount = if (isDayClosed) 0 else (students.size - presentCount - absentCount - leaveCount).coerceAtLeast(0)
-    val isDark = isSystemInDarkTheme()
+    val themeMode by viewModel.themeMode.collectAsState()
+    val isSystemDark = isSystemInDarkTheme()
+    val isDark = when (themeMode) {
+        com.example.ui.theme.AppThemeMode.SYSTEM -> isSystemDark
+        com.example.ui.theme.AppThemeMode.DARK -> true
+        com.example.ui.theme.AppThemeMode.LIGHT -> false
+    }
 
     // Helper to guard action modifications against locked back days
     val executeWithLockCheck: (() -> Unit) -> Unit = { action ->
@@ -589,6 +595,7 @@ fun AttendanceScreen(viewModel: CoachingViewModel) {
                         AttendanceStudentRow(
                             student = student,
                             status = status,
+                            isDark = isDark,
                             isLocked = isLocked,
                             onLockedAttempt = {
                                 showUnlockDialog = true
@@ -731,14 +738,13 @@ fun AttendanceScreen(viewModel: CoachingViewModel) {
 fun AttendanceStudentRow(
     student: Student,
     status: String?,
+    isDark: Boolean = false,
     isLocked: Boolean = false,
     onLockedAttempt: () -> Unit = {},
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
     onMarkLeave: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
-
     val cardBg = if (isDark) {
         when (status) {
             "PRESENT" -> Color(0xFF142E20)
@@ -771,8 +777,8 @@ fun AttendanceStudentRow(
         }
     }
 
-    val studentNameColor = if (isDark) Color(0xFFF8FAFC) else Color(0xFF0F172A)
-    val rollColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
+    val studentNameColor = MaterialTheme.colorScheme.onSurface
+    val rollColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -795,7 +801,7 @@ fun AttendanceStudentRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = student.name,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
                         fontWeight = FontWeight.Bold,
                         color = studentNameColor
                     )
@@ -809,16 +815,18 @@ fun AttendanceStudentRow(
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Roll: #${student.rollNumber} • ${student.batch}",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    fontWeight = FontWeight.Medium,
                     color = rollColor
                 )
             }
 
             // Quick Toggle Buttons: Present (P), Absent (A), Leave (L)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                val unselectedBtnBg = if (isDark) Color(0xFF273549) else Color(0xFFE2E8F0)
+                val unselectedBtnBg = if (isDark) Color(0xFF273549) else Color(0xFFF1F5F9)
                 val unselectedBtnContent = if (isDark) Color(0xFFCBD5E1) else Color(0xFF475569)
 
                 // Present Button (P)

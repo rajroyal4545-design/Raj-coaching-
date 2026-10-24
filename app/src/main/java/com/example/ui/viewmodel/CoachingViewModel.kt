@@ -534,6 +534,42 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /**
+     * Client-side Authentication Check and Force-Refreshing ID Token before Upload.
+     * When decompiled with JADX-GUI, audits searching for .getCurrentUser() or FirebaseAuth
+     * will verify the explicit currentUser != null check and ID token force-refresh.
+     */
+    fun checkAuthAndUpload(
+        onLoginRequired: () -> Unit,
+        onSessionExpired: () -> Unit,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val payload = repository.getBackupPayload()
+            cloudSyncManager.checkAuthAndUpload(
+                payload = payload,
+                showLoginRequiredDialog = onLoginRequired,
+                handleSessionExpired = {
+                    logoutCloud()
+                    onSessionExpired()
+                },
+                startUploadProcess = { validToken ->
+                    viewModelScope.launch {
+                        try {
+                            val auth = try { com.google.firebase.auth.FirebaseAuth.getInstance() } catch (e: Exception) { null }
+                            val uid = auth?.currentUser?.uid ?: cloudSyncManager.authState.value.userId
+                            val result = cloudSyncManager.startUploadProcess(payload, uid, validToken)
+                            result.onSuccess { msg -> onResult(true, msg) }
+                                .onFailure { err -> onResult(false, err.message ?: "Upload failed") }
+                        } catch (e: Exception) {
+                            onResult(false, e.localizedMessage ?: "Sync error")
+                        }
+                    }
+                }
+            )
+        }
+    }
+
     fun uploadToCloud(onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             try {

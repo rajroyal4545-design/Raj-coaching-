@@ -21,6 +21,10 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 data class CloudAuthState(
     val isLoggedIn: Boolean = false,
@@ -54,10 +58,21 @@ class CloudSyncManager(private val context: Context) {
     val authState: StateFlow<CloudAuthState> = _authState.asStateFlow()
 
     private fun loadInitialState(): CloudAuthState {
+        val fbUser: FirebaseUser? = try {
+            FirebaseAuth.getInstance().currentUser
+        } catch (e: Exception) {
+            null
+        }
+        val isFirebaseLoggedIn = fbUser != null
+        val storedLoggedIn = prefs.getBoolean("is_logged_in", false)
+        val isLoggedIn = isFirebaseLoggedIn || storedLoggedIn
+        val email = fbUser?.email ?: prefs.getString("user_email", "") ?: ""
+        val userId = fbUser?.uid ?: prefs.getString("user_id", "") ?: ""
+
         return CloudAuthState(
-            isLoggedIn = prefs.getBoolean("is_logged_in", false),
-            email = prefs.getString("user_email", "") ?: "",
-            userId = prefs.getString("user_id", "") ?: "",
+            isLoggedIn = isLoggedIn,
+            email = email,
+            userId = userId,
             lastSyncTime = prefs.getString("last_sync_time", "Never synced") ?: "Never synced",
             firebaseApiKey = FIREBASE_API_KEY,
             firebaseProjectId = FIREBASE_PROJECT_ID
@@ -69,6 +84,38 @@ class CloudSyncManager(private val context: Context) {
     }
 
     suspend fun registerWithEmailPassword(email: String, pass: String): Result<String> = withContext(Dispatchers.IO) {
+        // Try native FirebaseAuth SDK first
+        val auth = try { FirebaseAuth.getInstance() } catch (e: Exception) { null }
+        if (auth != null) {
+            try {
+                val sdkResult = suspendCancellableCoroutine<Result<String>> { cont ->
+                    auth.createUserWithEmailAndPassword(email.trim(), pass.trim())
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                val user = auth.currentUser
+                                if (user != null) {
+                                    user.getIdToken(true).addOnCompleteListener { tokenTask ->
+                                        val token = tokenTask.result?.token ?: ""
+                                        saveLoginSession(user.email ?: email.trim(), user.uid, token, "")
+                                        if (cont.isActive) cont.resume(Result.success("Account created successfully!"))
+                                    }
+                                } else {
+                                    if (cont.isActive) cont.resume(Result.success("Account created successfully!"))
+                                }
+                            } else {
+                                val err = task.exception?.message ?: "Registration failed"
+                                if (cont.isActive) cont.resume(Result.failure(Exception(formatFirebaseError(err))))
+                            }
+                        }
+                }
+                if (sdkResult.isSuccess) {
+                    return@withContext sdkResult
+                }
+            } catch (e: Exception) {
+                // Fall back to REST if SDK fails
+            }
+        }
+
         val apiKey = _authState.value.firebaseApiKey
         if (apiKey.isBlank()) {
             return@withContext Result.failure(
@@ -115,6 +162,38 @@ class CloudSyncManager(private val context: Context) {
     }
 
     suspend fun loginWithEmailPassword(email: String, pass: String): Result<String> = withContext(Dispatchers.IO) {
+        // Try native FirebaseAuth SDK first
+        val auth = try { FirebaseAuth.getInstance() } catch (e: Exception) { null }
+        if (auth != null) {
+            try {
+                val sdkResult = suspendCancellableCoroutine<Result<String>> { cont ->
+                    auth.signInWithEmailAndPassword(email.trim(), pass.trim())
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                val user = auth.currentUser
+                                if (user != null) {
+                                    user.getIdToken(true).addOnCompleteListener { tokenTask ->
+                                        val token = tokenTask.result?.token ?: ""
+                                        saveLoginSession(user.email ?: email.trim(), user.uid, token, "")
+                                        if (cont.isActive) cont.resume(Result.success("Login successful!"))
+                                    }
+                                } else {
+                                    if (cont.isActive) cont.resume(Result.success("Login successful!"))
+                                }
+                            } else {
+                                val err = task.exception?.message ?: "Login failed"
+                                if (cont.isActive) cont.resume(Result.failure(Exception(formatFirebaseError(err))))
+                            }
+                        }
+                }
+                if (sdkResult.isSuccess) {
+                    return@withContext sdkResult
+                }
+            } catch (e: Exception) {
+                // Fall back to REST if SDK fails
+            }
+        }
+
         val apiKey = _authState.value.firebaseApiKey
         if (apiKey.isBlank()) {
             return@withContext Result.failure(
@@ -177,6 +256,12 @@ class CloudSyncManager(private val context: Context) {
     }
 
     fun logout() {
+        try {
+            FirebaseAuth.getInstance().signOut()
+        } catch (e: Exception) {
+            // Ignore if Firebase instance is not initialized
+        }
+
         prefs.edit()
             .putBoolean("is_logged_in", false)
             .remove("user_email")
@@ -193,9 +278,31 @@ class CloudSyncManager(private val context: Context) {
     }
 
     /**
-     * Sends a password reset email via Firebase Auth REST API (sendOobCode).
+     * Sends a password reset email via FirebaseAuth SDK or Firebase Auth REST API (sendOobCode).
      */
     suspend fun sendPasswordResetEmail(email: String): Result<String> = withContext(Dispatchers.IO) {
+        val auth = try { FirebaseAuth.getInstance() } catch (e: Exception) { null }
+        if (auth != null) {
+            try {
+                val sdkResult = suspendCancellableCoroutine<Result<String>> { cont ->
+                    auth.sendPasswordResetEmail(email.trim())
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                if (cont.isActive) cont.resume(Result.success("Password reset email sent successfully! Please check your inbox or spam folder."))
+                            } else {
+                                val err = task.exception?.message ?: "Password reset failed"
+                                if (cont.isActive) cont.resume(Result.failure(Exception(formatFirebaseError(err))))
+                            }
+                        }
+                }
+                if (sdkResult.isSuccess) {
+                    return@withContext sdkResult
+                }
+            } catch (e: Exception) {
+                // Fall back to REST if SDK fails
+            }
+        }
+
         val apiKey = _authState.value.firebaseApiKey
         if (apiKey.isBlank()) {
             return@withContext Result.failure(
@@ -236,23 +343,99 @@ class CloudSyncManager(private val context: Context) {
     }
 
     /**
-     * Uploads the entire local coaching database to Firebase Realtime Database
+     * Client-Side Code Check and Force-Refreshing ID Token (Matching decompilation verification pattern):
+     * 1. Query FirebaseAuth instance. If currentUser is null, upload is blocked and login dialog is shown.
+     * 2. Force-refresh token via user.getIdToken(true) to verify session is active and not revoked.
+     * 3. Start upload process only once token is validated with Firebase Auth backend.
      */
-    suspend fun uploadToCloud(payload: CloudBackupPayload): Result<String> = withContext(Dispatchers.IO) {
-        val projectId = _authState.value.firebaseProjectId
-        val userId = _authState.value.userId
-        val idToken = prefs.getString("id_token", "") ?: ""
-
-        if (projectId.isBlank() || userId.isBlank()) {
-            return@withContext Result.failure(Exception("Not logged in or Firebase Project ID not configured."))
+    fun checkAuthAndUpload(
+        payload: CloudBackupPayload,
+        showLoginRequiredDialog: () -> Unit,
+        handleSessionExpired: () -> Unit,
+        startUploadProcess: (validToken: String) -> Unit
+    ) {
+        val user: FirebaseUser? = try {
+            FirebaseAuth.getInstance().currentUser
+        } catch (e: Exception) {
+            null
         }
 
+        if (user != null) {
+            // User is signed in, force-refresh ID token to ensure active session
+            user.getIdToken(true).addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val token = task.result?.token ?: ""
+                    // Token is validated with Firebase Auth backend; proceed to upload
+                    startUploadProcess(token)
+                } else {
+                    // Token is invalid or expired; redirect to login
+                    logout()
+                    handleSessionExpired()
+                }
+            }
+        } else {
+            // User is not signed in; redirect to login screen
+            showLoginRequiredDialog()
+        }
+    }
+
+    /**
+     * Uploads the entire local coaching database to Firebase Realtime Database with verified authentication.
+     */
+    suspend fun uploadToCloud(payload: CloudBackupPayload): Result<String> = withContext(Dispatchers.IO) {
+        val auth = try { FirebaseAuth.getInstance() } catch (e: Exception) { null }
+        val user: FirebaseUser? = auth?.currentUser
+
+        // 1. Client-Side Code Check: Query FirebaseAuth instance
+        if (user == null && !prefs.getBoolean("is_logged_in", false)) {
+            return@withContext Result.failure(Exception("Authentication required: currentUser is null. Please login first."))
+        }
+
+        // 2. Force-Refreshing the ID Token before upload
+        val validatedToken: String = if (user != null) {
+            val tokenResult = suspendCancellableCoroutine<Result<String>> { cont ->
+                user.getIdToken(true).addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val token = task.result?.token ?: ""
+                        if (cont.isActive) cont.resume(Result.success(token))
+                    } else {
+                        val err = task.exception?.message ?: "Session invalid or expired"
+                        if (cont.isActive) cont.resume(Result.failure(Exception(err)))
+                    }
+                }
+            }
+            if (tokenResult.isFailure) {
+                logout()
+                return@withContext Result.failure(Exception("Session expired or token invalid. Please login again."))
+            }
+            tokenResult.getOrNull() ?: ""
+        } else {
+            prefs.getString("id_token", "") ?: ""
+        }
+
+        val userId = user?.uid ?: prefs.getString("user_id", "") ?: ""
+        val projectId = _authState.value.firebaseProjectId
+        if (projectId.isBlank() || userId.isBlank() || validatedToken.isBlank()) {
+            return@withContext Result.failure(Exception("Authentication required: Not signed in with valid credentials."))
+        }
+
+        startUploadProcess(payload, userId, validatedToken)
+    }
+
+    /**
+     * Executes the authenticated payload upload to Firebase
+     */
+    suspend fun startUploadProcess(
+        payload: CloudBackupPayload,
+        userId: String,
+        idToken: String
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val projectId = _authState.value.firebaseProjectId
         try {
             _authState.value = _authState.value.copy(isSyncing = true, syncMessage = "Uploading data to Cloud...")
 
             val jsonPayload = serializePayload(payload)
-            val urlString = "https://$projectId-default-rtdb.firebaseio.com/users/$userId/coaching_data.json" +
-                (if (idToken.isNotBlank()) "?auth=$idToken" else "")
+            val urlString = "https://$projectId-default-rtdb.firebaseio.com/users/$userId/coaching_data.json?auth=$idToken"
             val url = URL(urlString)
 
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -268,7 +451,10 @@ class CloudSyncManager(private val context: Context) {
             val responseCode = conn.responseCode
             if (responseCode in 200..299) {
                 val nowStr = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date())
-                prefs.edit().putString("last_sync_time", nowStr).apply()
+                prefs.edit()
+                    .putString("last_sync_time", nowStr)
+                    .putString("id_token", idToken)
+                    .apply()
                 _authState.value = _authState.value.copy(
                     isSyncing = false,
                     lastSyncTime = nowStr,

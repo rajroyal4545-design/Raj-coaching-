@@ -349,9 +349,27 @@ fun SettingsScreen(viewModel: CoachingViewModel) {
                     ) {
                         Button(
                             onClick = {
-                                viewModel.uploadToCloud { success, msg ->
-                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                                }
+                                viewModel.checkAuthAndUpload(
+                                    onLoginRequired = {
+                                        showAuthDialog = true
+                                        Toast.makeText(
+                                            context,
+                                            "Authentication Required: Upload blocked! Please log in first. / कृपया पहले लॉगिन करें",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    },
+                                    onSessionExpired = {
+                                        showAuthDialog = true
+                                        Toast.makeText(
+                                            context,
+                                            "Session Expired: ID token invalidated. Please log in again. / सत्र समाप्त हो गया, कृपया दोबारा लॉगिन करें",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    },
+                                    onResult = { success, msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    }
+                                )
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)

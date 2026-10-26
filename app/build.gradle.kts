@@ -49,9 +49,19 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+            buildConfigField(
+                "String",
+                "GOOGLE_WEB_CLIENT_ID",
+                "\"${System.getenv("GOOGLE_WEB_CLIENT_ID") ?: ""}\""
+            )
         }
 
         debug {
+            buildConfigField(
+                "String",
+                "GOOGLE_WEB_CLIENT_ID",
+                "\"${System.getenv("GOOGLE_WEB_CLIENT_ID") ?: ""}\""
+            )
         }
     }
 

@@ -6,6 +6,8 @@ plugins {
     id("io.github.takahirom.roborazzi")
 }
 
+val googleWebClientId = System.getenv("GOOGLE_WEB_CLIENT_ID") ?: "REPLACE_WITH_WEB_CLIENT_ID"
+
 android {
     namespace = "com.example"
 
@@ -49,19 +51,11 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
-            buildConfigField(
-                "String",
-                "GOOGLE_WEB_CLIENT_ID",
-                "\"${System.getenv("GOOGLE_WEB_CLIENT_ID") ?: ""}\""
-            )
+            buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         }
 
         debug {
-            buildConfigField(
-                "String",
-                "GOOGLE_WEB_CLIENT_ID",
-                "\"${System.getenv("GOOGLE_WEB_CLIENT_ID") ?: ""}\""
-            )
+            buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         }
     }
 

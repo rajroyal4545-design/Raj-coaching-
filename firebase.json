@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-android-coaching-e2b23df1-a131-473d-8224-7423cd153511",
+      "rules": "firestore.rules"
+    }
+  ]
+}

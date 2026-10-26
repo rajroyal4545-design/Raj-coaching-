@@ -1,49 +1,3 @@
-val googleServicesFile = file("google-services.json")
-if (!googleServicesFile.exists()) {
-    googleServicesFile.writeText(
-        """{
-  "project_info": {
-    "project_number": "918185425185",
-    "firebase_url": "https://coaching-manager-b876f-default-rtdb.firebaseio.com",
-    "project_id": "coaching-manager-b876f",
-    "storage_bucket": "coaching-manager-b876f.firebasestorage.app"
-  },
-  "client": [
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:918185425185:android:e8ef3ea0ddbd4a49666660",
-        "android_client_info": {
-          "package_name": "com.aistudio.coachingmanager.mvwkqp"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "918185425185-4l1nhbril33fvjt96t2q9cj2d4rp05tj.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAbLHeCSOflKENOL9TQFFHdzmcMGlZdnQc"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "918185425185-4l1nhbril33fvjt96t2q9cj2d4rp05tj.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    }
-  ],
-  "configuration_version": "1"
-}"""
-    )
-}
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -131,6 +85,10 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.material:material-icons-core")
@@ -150,6 +108,7 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("androidx.test:core:1.6.1")

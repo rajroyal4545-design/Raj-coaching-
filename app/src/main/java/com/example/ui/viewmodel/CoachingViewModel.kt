@@ -486,52 +486,39 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
     private val cloudSyncManager = CloudSyncManager(application)
     val cloudAuthState: StateFlow<CloudAuthState> = cloudSyncManager.authState
 
-    fun saveFirebaseConfig(projectId: String, apiKey: String) {
-        cloudSyncManager.saveFirebaseConfig(projectId, apiKey)
-    }
-
-    fun registerCloud(email: String, pass: String, onResult: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
-            val result = cloudSyncManager.registerWithEmailPassword(email, pass)
-            result.onSuccess { msg ->
-                uploadToCloud { _, _ -> }
-                onResult(true, msg)
-            }.onFailure { err ->
-                onResult(false, err.message ?: "Registration failed")
-            }
-        }
-    }
-
-    fun loginCloud(email: String, pass: String, onResult: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
-            val result = cloudSyncManager.loginWithEmailPassword(email, pass)
-            result.onSuccess { msg ->
-                downloadFromCloud { success, _ ->
-                    if (success) {
-                        onResult(true, "Login successful! Cloud database synced on this device.")
-                    } else {
-                        onResult(true, "Login successful!")
+    fun signInWithGoogle(activity: android.app.Activity, onResult: (Boolean, String) -> Unit) {
+        cloudSyncManager.signInWithGoogle(
+            activity = activity,
+            onAuthSuccess = { user ->
+                viewModelScope.launch {
+                    val downloadRes = cloudSyncManager.downloadFromCloud()
+                    downloadRes.onSuccess { payload ->
+                        repository.restoreAllData(payload)
+                        val name = user.displayName?.ifBlank { user.email } ?: (user.email ?: "User")
+                        onResult(true, "Google Sign-In successful! ($name) Synced ${payload.students.size} students from Cloud.")
+                    }.onFailure { downloadErr ->
+                        if (downloadErr.message?.contains("No data found") == true) {
+                            uploadToCloud { _, _ -> }
+                            val name = user.displayName?.ifBlank { user.email } ?: (user.email ?: "User")
+                            onResult(true, "Welcome $name! Local data backed up to your Google account.")
+                        } else {
+                            val name = user.displayName?.ifBlank { user.email } ?: (user.email ?: "User")
+                            onResult(true, "Signed in as $name.")
+                        }
                     }
                 }
-            }.onFailure { err ->
-                onResult(false, err.message ?: "Login failed")
+            },
+            onAuthError = { err ->
+                onResult(false, err)
+            },
+            onAuthCancelled = {
+                onResult(false, "Google Sign-In cancelled / साइन-इन रद्द")
             }
-        }
+        )
     }
 
-    fun logoutCloud() {
-        cloudSyncManager.logout()
-    }
-
-    fun resetCloudPassword(email: String, onResult: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
-            val result = cloudSyncManager.sendPasswordResetEmail(email)
-            result.onSuccess { msg ->
-                onResult(true, msg)
-            }.onFailure { err ->
-                onResult(false, err.message ?: "Failed to send reset email")
-            }
-        }
+    fun logoutCloud(activity: android.app.Activity? = null) {
+        cloudSyncManager.logout(activity)
     }
 
     /**
@@ -592,7 +579,7 @@ class CoachingViewModel(application: Application) : AndroidViewModel(application
                 val result = cloudSyncManager.downloadFromCloud()
                 result.onSuccess { payload ->
                     repository.restoreAllData(payload)
-                    onResult(true, "Data successfully downloaded & synced from Cloud!")
+                    onResult(true, "Data successfully downloaded & synced! (${payload.students.size} students, ${payload.attendance.size} attendance records restored)")
                 }.onFailure { err ->
                     onResult(false, err.message ?: "Download failed")
                 }

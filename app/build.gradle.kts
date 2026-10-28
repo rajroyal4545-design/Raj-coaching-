@@ -6,7 +6,7 @@ plugins {
     id("io.github.takahirom.roborazzi")
 }
 
-val googleWebClientId = System.getenv("GOOGLE_WEB_CLIENT_ID") ?: "REPLACE_WITH_WEB_CLIENT_ID"
+val googleWebClientId = System.getenv("GOOGLE_WEB_CLIENT_ID") ?: "508426948790-nhesn94stvricufpdlm12b41t34njjj4.apps.googleusercontent.com"
 
 android {
     namespace = "com.example"
@@ -24,6 +24,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "WEB_CLIENT_ID", "\"508426948790-nhesn94stvricufpdlm12b41t34njjj4.apps.googleusercontent.com\"")
     }
 
     signingConfigs {

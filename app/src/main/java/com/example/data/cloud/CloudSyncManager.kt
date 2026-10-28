@@ -125,9 +125,23 @@ class CloudSyncManager(private val context: Context) {
     ) {
         CoroutineScope(Dispatchers.Main).launch {
             try {
-                _authState.value = _authState.value.copy(isSyncing = true, syncMessage = "Connecting with Google...")
                 val credentialManager = CredentialManager.create(activity)
-                val serverClientId = activity.getString(com.example.R.string.default_web_client_id)
+                val fallbackClientId = if (com.example.BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank() && !com.example.BuildConfig.GOOGLE_WEB_CLIENT_ID.contains("REPLACE")) {
+                    com.example.BuildConfig.GOOGLE_WEB_CLIENT_ID
+                } else {
+                    com.example.BuildConfig.WEB_CLIENT_ID
+                }
+                val serverClientId = try {
+                    val resId = activity.resources.getIdentifier("default_web_client_id", "string", activity.packageName)
+                    if (resId != 0) {
+                        val clientStr = activity.getString(resId)
+                        if (clientStr.isNotBlank()) clientStr else fallbackClientId
+                    } else {
+                        fallbackClientId
+                    }
+                } catch (e: Exception) {
+                    fallbackClientId
+                }
 
                 val googleIdOption = GetSignInWithGoogleOption.Builder(
                     serverClientId = serverClientId

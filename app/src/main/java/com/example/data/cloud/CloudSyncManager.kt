@@ -28,6 +28,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
@@ -194,11 +195,17 @@ class CloudSyncManager(private val context: Context) {
                     _authState.value = _authState.value.copy(isSyncing = false, syncMessage = null)
                     onAuthError("Unexpected credential format received")
                 }
+            } catch (e: NoCredentialException) {
+                _authState.value = _authState.value.copy(isSyncing = false, syncMessage = null)
+                Log.w("CloudSyncManager", "No Google account found on device: ${e.message}")
+                onAuthError("No Google account found on device. Please add a Google account in phone Settings.")
             } catch (e: GetCredentialCancellationException) {
                 _authState.value = _authState.value.copy(isSyncing = false, syncMessage = null)
+                Log.i("CloudSyncManager", "User cancelled Google Sign-In prompt")
                 onAuthCancelled()
             } catch (e: Exception) {
                 _authState.value = _authState.value.copy(isSyncing = false, syncMessage = null)
+                Log.e("CloudSyncManager", "Google Sign-In failed: ${e.message}", e)
                 onAuthError(e.localizedMessage ?: "Google Sign-In failed")
             }
         }

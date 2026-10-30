@@ -56,6 +56,7 @@ android {
         }
 
         debug {
+            signingConfig = signingConfigs.getByName("debugConfig")
             buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         }
     }
